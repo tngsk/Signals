@@ -6,7 +6,10 @@ by a control voltage signal, enabling dynamic amplitude control through
 envelopes, LFOs, or other modulation sources.
 """
 
+from typing import Optional
+
 from ..core.module import Module, ParameterType, Signal, SignalType
+from ..core.context import get_sample_rate_or_default
 from ..core.logging import get_logger, performance_logger, log_module_state
 
 
@@ -20,25 +23,31 @@ class VCA(Module):
     and other amplitude-based modulations.
 
     Args:
-        sample_rate: Audio sample rate in Hz (required for consistency with other modules)
+        sample_rate: Audio sample rate in Hz (optional, uses context if available)
 
     Attributes:
         gain (float): Base gain level applied before control voltage modulation (default: 1.0)
 
     Example:
-        >>> vca = VCA()
+        >>> # With explicit sample rate
+        >>> vca = VCA(sample_rate=48000)
+        >>> 
+        >>> # Or with context (recommended)
+        >>> with SynthContext(sample_rate=48000):
+        ...     vca = VCA()
+        >>> 
         >>> vca.set_parameter("gain", 0.8)
         >>> # Connect audio to input 0, control voltage to input 1
         >>> modulated_signal = vca.process([audio_signal, cv_signal])[0]
     """
 
-    def __init__(self, sample_rate: int):
+    def __init__(self, sample_rate: Optional[int] = None):
         super().__init__(input_count=2, output_count=1)  # Audio input + CV input
-        self.sample_rate = sample_rate
+        self.sample_rate = get_sample_rate_or_default(sample_rate)
         self.gain: float = 1.0
         self.logger = get_logger('modules.vca')
         
-        self.logger.debug(f"VCA initialized: sample_rate={sample_rate}")
+        self.logger.debug(f"VCA initialized: sample_rate={self.sample_rate}")
 
     def set_parameter(self, name: str, value: ParameterType):
         """

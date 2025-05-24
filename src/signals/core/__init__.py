@@ -14,6 +14,10 @@ from .logging import (
     enable_performance_logging, performance_logger,
     LogContext, LogLevel, log_module_state, log_signal_info
 )
+from .context import (
+    SynthContext, synthesis_context, get_sample_rate_or_default,
+    require_context, ContextError
+)
 
 __all__ = [
     "Module",
@@ -31,5 +35,11 @@ __all__ = [
     "LogContext",
     "LogLevel",
     "log_module_state",
-    "log_signal_info"
+    "log_signal_info",
+    # Context management
+    "SynthContext",
+    "synthesis_context",
+    "get_sample_rate_or_default",
+    "require_context",
+    "ContextError"
 ]

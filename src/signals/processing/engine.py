@@ -8,12 +8,14 @@ Designed for both interactive use and external program integration.
 
 from typing import Dict, Any, List, Optional, Union, Callable
 from pathlib import Path
+from contextlib import contextmanager
 import numpy as np
 import time
 
 from .patch import Patch, PatchTemplate, PatchError
 from .graph import ModuleGraph, GraphError
 from ..core.module import Signal, SignalType
+from ..core.context import SynthContext, synthesis_context
 from ..core.logging import get_logger, performance_logger, log_module_state
 
 
@@ -30,11 +32,20 @@ class SynthEngine:
     setting parameters dynamically, and rendering audio output. It handles
     all the complexity of module graph management and signal routing.
     
+    The engine also serves as a synthesis context, allowing modules to be
+    created without explicit sample rate specification.
+    
     Example:
         >>> engine = SynthEngine(sample_rate=48000)
         >>> patch = engine.load_patch("synth.yaml")
         >>> audio_data = engine.render(duration=2.0)
         >>> engine.save_audio("output.wav", audio_data)
+        
+        >>> # Or use as context manager
+        >>> with SynthEngine(sample_rate=48000) as engine:
+        ...     # Modules created here automatically use engine's sample rate
+        ...     osc = Oscillator()
+        ...     env = EnvelopeADSR()
     """
     
     def __init__(self, sample_rate: int = 48000, buffer_size: int = 1024):
@@ -43,6 +54,7 @@ class SynthEngine:
         self.current_patch: Optional[Patch] = None
         self.current_graph: Optional[ModuleGraph] = None
         self._processing_callbacks: List[Callable] = []
+        self._context: Optional[SynthContext] = None
         self.logger = get_logger('processing.engine')
         
         self.logger.info(f"SynthEngine initialized: sample_rate={sample_rate}Hz, buffer_size={buffer_size}")
@@ -78,9 +90,10 @@ class SynthEngine:
             # Override sample rate from engine
             patch.sample_rate = self.sample_rate
             
-            # Build module graph
-            self.current_patch = patch
-            self.current_graph = ModuleGraph(patch)
+            # Build module graph within context
+            with self.context():
+                self.current_patch = patch
+                self.current_graph = ModuleGraph(patch)
             
             # Configure envelopes with auto duration detection
             self._configure_envelope_durations()
@@ -95,6 +108,41 @@ class SynthEngine:
         except Exception as e:
             self.logger.error(f"Unexpected error loading patch: {e}")
             raise EngineError(f"Unexpected error loading patch: {e}")
+    
+    def __enter__(self):
+        """Enter the engine as a context manager."""
+        self._context = SynthContext(self.sample_rate)
+        self._context.__enter__()
+        self.logger.debug(f"Entered SynthEngine context: sample_rate={self.sample_rate}")
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit the engine context manager."""
+        if self._context:
+            self._context.__exit__(exc_type, exc_val, exc_tb)
+            self._context = None
+        self.logger.debug("Exited SynthEngine context")
+    
+    @contextmanager
+    def context(self):
+        """
+        Create a synthesis context with this engine's sample rate.
+        
+        This context manager allows modules to be created without explicit
+        sample rate specification, using the engine's sample rate instead.
+        
+        Yields:
+            SynthContext: Context with engine's sample rate
+            
+        Example:
+            >>> engine = SynthEngine(sample_rate=48000)
+            >>> with engine.context():
+            ...     osc = Oscillator()  # Uses 48000 Hz
+            ...     env = EnvelopeADSR()  # Uses 48000 Hz
+        """
+        with synthesis_context(self.sample_rate) as ctx:
+            self.logger.debug(f"Created synthesis context: sample_rate={self.sample_rate}")
+            yield ctx
     
     def load_patch_from_dict(self, patch_data: Dict[str, Any]) -> Patch:
         """

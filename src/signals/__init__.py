@@ -19,6 +19,7 @@ Example:
 # Import from reorganized structure
 from .core import Module, Signal, SignalType, ParameterType, write_wav
 from .core import get_logger, configure_logging, set_module_log_level, LogLevel
+from .core import SynthContext, synthesis_context, get_sample_rate_or_default, ContextError
 from .modules import Oscillator, EnvelopeADSR, Mixer, OutputWav, VCA
 from .processing import SynthEngine, ModuleGraph, Patch, PatchTemplate
 
@@ -30,6 +31,12 @@ __all__ = [
     "SignalType",
     "ParameterType",
     "write_wav",
+    
+    # Context management
+    "SynthContext",
+    "synthesis_context",
+    "get_sample_rate_or_default",
+    "ContextError",
     
     # Logging
     "get_logger",

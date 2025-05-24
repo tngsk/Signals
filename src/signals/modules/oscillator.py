@@ -8,10 +8,12 @@ frequency and amplitude modulation and maintains phase continuity.
 
 import math
 from enum import Enum
+from typing import Optional
 
 import numpy as np
 
 from ..core.module import Module, ParameterType, Signal, SignalType
+from ..core.context import get_sample_rate_or_default
 from ..core.logging import get_logger, performance_logger, log_module_state
 
 
@@ -43,7 +45,7 @@ class Oscillator(Module):
     are modified and can accept frequency modulation inputs.
 
     Args:
-        sample_rate: Audio sample rate in Hz
+        sample_rate: Audio sample rate in Hz (optional, uses context if available)
         waveform: Initial waveform type (default: SINE)
 
     Attributes:
@@ -54,24 +56,30 @@ class Oscillator(Module):
         amplitude (float): Output amplitude scaling factor (default: 1.0)
 
     Example:
+        >>> # With explicit sample rate
         >>> osc = Oscillator(sample_rate=48000, waveform=WaveformType.SINE)
+        >>> 
+        >>> # Or with context (recommended)
+        >>> with SynthContext(sample_rate=48000):
+        ...     osc = Oscillator(waveform=WaveformType.SINE)
+        >>> 
         >>> osc.set_parameter("frequency", 440.0)
         >>> osc.set_parameter("amplitude", 0.8)
         >>> signal = osc.process()[0]
     """
 
-    def __init__(self, sample_rate: int, waveform: WaveformType = WaveformType.SINE):
+    def __init__(self, sample_rate: Optional[int] = None, waveform: WaveformType = WaveformType.SINE):
         super().__init__(
             input_count=1, output_count=1
         )  # Input for frequency modulation
-        self.sample_rate = sample_rate
+        self.sample_rate = get_sample_rate_or_default(sample_rate)
         self.waveform = waveform
         self.frequency: float = 440.0
         self.phase: float = 0.0
         self.amplitude: float = 1.0
         self.logger = get_logger('modules.oscillator')
         
-        self.logger.debug(f"Oscillator initialized: sample_rate={sample_rate}, waveform={waveform.value}")
+        self.logger.debug(f"Oscillator initialized: sample_rate={self.sample_rate}, waveform={waveform.value}")
 
     def set_parameter(self, name: str, value: ParameterType):
         """

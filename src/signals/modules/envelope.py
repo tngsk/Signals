@@ -9,9 +9,11 @@ smooth transitions between different phases.
 
 import numpy as np
 import re
-from typing import Union
+import math
+from typing import Union, Optional
 
 from ..core.module import Module, ParameterType, Signal, SignalType
+from ..core.context import get_sample_rate_or_default
 from ..core.logging import get_logger, performance_logger, log_module_state
 
 
@@ -26,7 +28,7 @@ class EnvelopeADSR(Module):
     - Release: Linear fall from sustain level to 0
 
     Args:
-        sample_rate: Audio sample rate in Hz
+        sample_rate: Audio sample rate in Hz (optional, uses context if available)
 
     Attributes:
         sample_rate (int): Sample rate for timing calculations
@@ -36,7 +38,13 @@ class EnvelopeADSR(Module):
         release_time (float): Release phase duration in seconds (default: 0.2)
 
     Example:
+        >>> # With explicit sample rate
         >>> env = EnvelopeADSR(sample_rate=48000)
+        >>> 
+        >>> # Or with context (recommended)
+        >>> with SynthContext(sample_rate=48000):
+        ...     env = EnvelopeADSR()
+        >>> 
         >>> env.set_parameter("attack", 0.1)
         >>> env.set_parameter("sustain", 0.6)
         >>> env.trigger_on()  # Start envelope
@@ -44,9 +52,9 @@ class EnvelopeADSR(Module):
         >>> env.trigger_off()  # Begin release phase
     """
 
-    def __init__(self, sample_rate: int):
+    def __init__(self, sample_rate: Optional[int] = None):
         super().__init__(input_count=1, output_count=1)  # Input for trigger
-        self.sample_rate = sample_rate
+        self.sample_rate = get_sample_rate_or_default(sample_rate)
         self.logger = get_logger('modules.envelope')
         
         # Original time-based parameters
@@ -54,6 +62,13 @@ class EnvelopeADSR(Module):
         self.decay_time: float = 0.1  # seconds
         self.sustain_level: float = 0.7  # 0.0 to 1.0
         self.release_time: float = 0.2  # seconds
+        
+        # Anti-click configuration
+        # 5ms minimum balances click prevention with musical expression
+        # Shorter times would cause audible artifacts, longer times would
+        # interfere with musical techniques like staccato and percussion
+        self.min_release_time: float = 0.005  # 5ms minimum to prevent clicks
+        self.use_exponential_release: bool = True  # Use exponential decay for smoother release
         
         # Enhanced parameter storage (raw values as entered by user)
         self._attack_param: Union[str, float] = 0.05
@@ -77,7 +92,11 @@ class EnvelopeADSR(Module):
         self._value: float = 0.0
         self._note_on: bool = False
         
-        self.logger.debug(f"EnvelopeADSR initialized: sample_rate={sample_rate}")
+        # Anti-click state
+        self._release_start_value: float = 0.0  # Value when release starts
+        self._release_coefficient: float = 0.0  # Exponential decay coefficient
+        
+        self.logger.debug(f"EnvelopeADSR initialized: sample_rate={self.sample_rate}")
 
     def set_parameter(self, name: str, value: ParameterType):
         """
@@ -124,8 +143,14 @@ class EnvelopeADSR(Module):
             self._release_param = value
             self._auto_release = (value == "auto")
             if not self._auto_release:
-                self.release_time = self._parse_time_parameter(value)
+                requested_time = self._parse_time_parameter(value)
+                # Apply minimum release time to prevent clicks
+                self.release_time = max(requested_time, self.min_release_time)
+                if requested_time < self.min_release_time:
+                    self.logger.warning(f"Release time {requested_time:.3f}s too short, extended to {self.release_time:.3f}s to prevent clicks")
                 self._release_samples = int(self.release_time * self.sample_rate)
+                # Recalculate exponential coefficient
+                self._update_release_coefficient()
             self._recalculate_auto_times()
             self.logger.debug(f"Release parameter set: {value} -> {self.release_time:.3f}s")
         elif name == "total_duration":
@@ -165,6 +190,8 @@ class EnvelopeADSR(Module):
         if self._phase != 0:  # If not idle
             self._phase = 4  # Release
             self._current_sample = 0
+            self._release_start_value = self._value
+            self._update_release_coefficient()
             self.logger.debug(f"Envelope triggered OFF - starting release phase from value {self._value:.3f}")
 
     @performance_logger
@@ -227,20 +254,29 @@ class EnvelopeADSR(Module):
             if (
                 not self._note_on
             ):  # Should have been caught by trigger_off, but as a safeguard
-                self._phase = 4  # Release
-                self._current_sample = 0
+                    self._phase = 4  # Release
+                    self._current_sample = 0
+                    self._release_start_value = self._value
+                    self._update_release_coefficient()
         elif self._phase == 4:  # Release
-            self._value = self.sustain_level * (
-                1.0
-                - (
+            if self.use_exponential_release and self._release_coefficient > 0:
+                # Exponential decay for smoother release
+                self._value = self._release_start_value * math.exp(-self._release_coefficient * self._current_sample)
+                # Check if value is close enough to zero to stop (more aggressive threshold)
+                if self._value < 0.000001 or self._current_sample >= self._release_samples * 2:
+                    self._phase = 0  # Idle
+                    self._value = 0.0
+            else:
+                # Linear release (fallback)
+                progress = (
                     self._current_sample / self._release_samples
                     if self._release_samples > 0
                     else 1.0
                 )
-            )
-            if self._current_sample >= self._release_samples:
-                self._phase = 0  # Idle
-                self._value = 0.0
+                self._value = self._release_start_value * (1.0 - progress)
+                if self._current_sample >= self._release_samples:
+                    self._phase = 0  # Idle
+                    self._value = 0.0
 
         if self._phase != 0:
             self._current_sample += 1
@@ -295,8 +331,10 @@ class EnvelopeADSR(Module):
             self._decay_samples = int(self.decay_time * self.sample_rate)
         
         if not self._auto_release:
-            self.release_time = self._parse_time_parameter(self._release_param)
+            requested_time = self._parse_time_parameter(self._release_param)
+            self.release_time = max(requested_time, self.min_release_time)
             self._release_samples = int(self.release_time * self.sample_rate)
+            self._update_release_coefficient()
         
         self._recalculate_auto_times()
     
@@ -328,8 +366,10 @@ class EnvelopeADSR(Module):
             available_time = max(0.0, self._total_duration - used_time - reserved_sustain_time)
             auto_time_each = available_time / auto_count if auto_count > 0 else 0.0
             
-            # Ensure minimum time for each auto parameter
-            auto_time_each = max(auto_time_each, 0.01)  # Minimum 10ms
+            # Ensure minimum time for each auto parameter (with anti-click minimum)
+            # Use 10ms for auto mode to be more conservative when user doesn't specify exact times
+            min_time = max(0.01, self.min_release_time)  # At least 10ms or anti-click minimum
+            auto_time_each = max(auto_time_each, min_time)
             
 
             
@@ -342,8 +382,9 @@ class EnvelopeADSR(Module):
                 self._decay_samples = int(self.decay_time * self.sample_rate)
             
             if self._auto_release:
-                self.release_time = auto_time_each
+                self.release_time = max(auto_time_each, self.min_release_time)
                 self._release_samples = int(self.release_time * self.sample_rate)
+                self._update_release_coefficient()
     
     def set_total_duration(self, duration: float):
         """
@@ -386,5 +427,44 @@ class EnvelopeADSR(Module):
             'auto_decay': self._auto_decay,
             'auto_release': self._auto_release,
             'current_phase': self._phase,
-            'current_value': self._value
+            'current_value': self._value,
+            'min_release_time': self.min_release_time,
+            'use_exponential_release': self.use_exponential_release,
+            'release_coefficient': self._release_coefficient
         }
+    
+    def _update_release_coefficient(self):
+        """Update the exponential release coefficient for smooth decay."""
+        if self.release_time > 0 and self.use_exponential_release:
+            # Calculate coefficient for exponential decay
+            # Target: reach 0.1% of initial value at end of release time for smoother tail
+            # Formula: exp(-coeff * time) = 0.001 => coeff = -ln(0.001) / time
+            # This creates a gentler exponential curve
+            self._release_coefficient = -math.log(0.001) / (self.release_time * self.sample_rate)
+        else:
+            self._release_coefficient = 0.0
+    
+    def set_anti_click_mode(self, enabled: bool, min_time: float = 0.005):
+        """
+        Configure anti-click behavior.
+        
+        The default 5ms minimum provides the best balance between click prevention
+        and musical expression. Values below 5ms cause audible artifacts, while
+        values above 5ms can interfere with fast musical passages, staccato notes,
+        and percussion sounds that require very short release times.
+        
+        Args:
+            enabled: Whether to enforce minimum release times
+            min_time: Minimum release time in seconds (default 5ms for musical balance)
+        """
+        self.min_release_time = min_time if enabled else 0.0
+        self.use_exponential_release = enabled
+        
+        # Recalculate current release if needed
+        if not self._auto_release:
+            requested_time = self._parse_time_parameter(self._release_param)
+            self.release_time = max(requested_time, self.min_release_time)
+            self._release_samples = int(self.release_time * self.sample_rate)
+            self._update_release_coefficient()
+        
+        self.logger.info(f"Anti-click mode {'enabled' if enabled else 'disabled'}, min_time={min_time*1000:.1f}ms")
