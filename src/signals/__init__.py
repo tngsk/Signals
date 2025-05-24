@@ -13,16 +13,16 @@ This package provides a modular synthesizer framework with the following compone
 
 Example:
     Basic synthesis setup:
-    
+
     >>> from signals import Oscillator, EnvelopeADSR, OutputWav
     >>> osc = Oscillator(sample_rate=48000)
     >>> env = EnvelopeADSR(sample_rate=48000)
     >>> output = OutputWav("output.wav", sample_rate=48000)
 """
 
-from .module import Module, Signal, ParameterType, SignalType
-from .oscillator import Oscillator
+from .dsp import write_wav
 from .envelope import EnvelopeADSR
 from .mixer import Mixer
+from .module import Module, ParameterType, Signal, SignalType
+from .oscillator import Oscillator
 from .output import OutputWav
-from .dsp import write_wav
