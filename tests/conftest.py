@@ -380,6 +380,185 @@ def performance_timer():
 
 
 @pytest.fixture
+def timeout_context():
+    """Context manager for timeout-based testing."""
+    import signal
+    import threading
+    
+    class TimeoutContext:
+        def __init__(self, timeout_seconds=5):
+            self.timeout_seconds = timeout_seconds
+            self.timed_out = False
+            
+        def __enter__(self):
+            if hasattr(signal, 'SIGALRM'):  # Unix-like systems
+                def timeout_handler(signum, frame):
+                    raise TimeoutError(f"Operation timed out after {self.timeout_seconds}s")
+                
+                self.old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(self.timeout_seconds)
+            return self
+            
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, self.old_handler)
+    
+    return TimeoutContext
+
+
+@pytest.fixture
+def memory_monitor():
+    """Memory usage monitoring for performance tests."""
+    try:
+        import psutil
+        import os
+        
+        class MemoryMonitor:
+            def __init__(self):
+                self.process = psutil.Process(os.getpid())
+                self.initial_memory = None
+                self.samples = []
+            
+            def start(self):
+                self.initial_memory = self.process.memory_info().rss / 1024 / 1024  # MB
+                self.samples = [self.initial_memory]
+                return self
+            
+            def sample(self):
+                current_memory = self.process.memory_info().rss / 1024 / 1024  # MB
+                self.samples.append(current_memory)
+                return current_memory
+            
+            def get_peak(self):
+                return max(self.samples) if self.samples else 0
+            
+            def get_growth(self):
+                if len(self.samples) < 2:
+                    return 0
+                return max(self.samples) - self.samples[0]
+        
+        return MemoryMonitor
+        
+    except ImportError:
+        # Fallback for systems without psutil
+        class MockMemoryMonitor:
+            def start(self):
+                return self
+            def sample(self):
+                return 0
+            def get_peak(self):
+                return 0
+            def get_growth(self):
+                return 0
+        
+        return MockMemoryMonitor
+
+
+@pytest.fixture
+def profiler_context():
+    """cProfile context manager for performance analysis."""
+    import cProfile
+    import pstats
+    import io
+    
+    class ProfilerContext:
+        def __init__(self):
+            self.profiler = None
+            self.stats = None
+        
+        def __enter__(self):
+            self.profiler = cProfile.Profile()
+            self.profiler.enable()
+            return self
+        
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self.profiler.disable()
+            s = io.StringIO()
+            self.stats = pstats.Stats(self.profiler, stream=s)
+            self.stats.sort_stats('cumulative')
+        
+        def get_stats(self, num_lines=10):
+            if self.stats:
+                s = io.StringIO()
+                stats = pstats.Stats(self.profiler, stream=s)
+                stats.sort_stats('cumulative')
+                stats.print_stats(num_lines)
+                return s.getvalue()
+            return ""
+        
+        def get_function_time(self, function_name):
+            """Get total time spent in functions containing function_name."""
+            if not self.stats:
+                return 0
+            
+            total_time = 0
+            for func_info, (call_count, _, cumulative_time, _, _) in self.stats.stats.items():
+                func_name = func_info[2]
+                if function_name in func_name:
+                    total_time += cumulative_time
+            return total_time
+    
+    return ProfilerContext
+
+
+@pytest.fixture
+def performance_benchmark():
+    """Performance benchmarking utilities."""
+    import time
+    
+    class PerformanceBenchmark:
+        def __init__(self):
+            self.benchmarks = {}
+        
+        def time_function(self, func, *args, **kwargs):
+            """Time a single function call."""
+            start_time = time.perf_counter()
+            result = func(*args, **kwargs)
+            end_time = time.perf_counter()
+            return result, end_time - start_time
+        
+        def time_multiple(self, func, iterations=100, *args, **kwargs):
+            """Time multiple iterations of a function."""
+            times = []
+            for _ in range(iterations):
+                start_time = time.perf_counter()
+                func(*args, **kwargs)
+                end_time = time.perf_counter()
+                times.append(end_time - start_time)
+            
+            return {
+                'times': times,
+                'avg': sum(times) / len(times),
+                'min': min(times),
+                'max': max(times),
+                'total': sum(times)
+            }
+        
+        def compare_functions(self, funcs_dict, iterations=100):
+            """Compare performance of multiple functions."""
+            results = {}
+            for name, func_info in funcs_dict.items():
+                func = func_info['func']
+                args = func_info.get('args', ())
+                kwargs = func_info.get('kwargs', {})
+                results[name] = self.time_multiple(func, iterations, *args, **kwargs)
+            return results
+        
+        def assert_performance_bounds(self, timing, max_time_ms, operation_name="Operation"):
+            """Assert that timing is within performance bounds."""
+            max_time_s = max_time_ms / 1000.0
+            assert timing < max_time_s, f"{operation_name} took {timing*1000:.3f}ms, expected <{max_time_ms}ms"
+        
+        def assert_realtime_factor(self, render_time, audio_duration, max_factor=1.0):
+            """Assert that audio rendering maintains realtime performance."""
+            realtime_factor = render_time / audio_duration
+            assert realtime_factor <= max_factor, f"Realtime factor {realtime_factor:.2f}x exceeds {max_factor}x"
+    
+    return PerformanceBenchmark
+
+
+@pytest.fixture
 def audio_validator():
     """Audio validation utilities."""
     class AudioValidator:

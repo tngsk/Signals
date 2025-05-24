@@ -197,3 +197,6 @@ temp/
 debug_*.yaml
 demo_*.yaml
 perf_test.yaml
+
+# Reports and test outputs
+reports/
