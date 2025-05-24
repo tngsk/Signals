@@ -1,0 +1,73 @@
+name: "Multi-Oscillator Synthesizer"
+description: "Advanced synthesizer with multiple oscillators mixed together and controlled by a shared envelope"
+sample_rate: 48000
+
+modules:
+  osc1:
+    type: "oscillator"
+    parameters:
+      waveform: "sine"
+      frequency: 440.0
+      amplitude: 0.6
+
+  osc2:
+    type: "oscillator"
+    parameters:
+      waveform: "saw"
+      frequency: 659.25 # E5 - perfect fifth above A4
+      amplitude: 0.4
+
+  osc3:
+    type: "oscillator"
+    parameters:
+      waveform: "square"
+      frequency: 329.63 # E4 - octave below E5
+      amplitude: 0.3
+
+  mixer1:
+    type: "mixer"
+    parameters:
+      num_inputs: 3
+      gain1: 0.8
+      gain2: 0.6
+      gain3: 0.4
+
+  env1:
+    type: "envelope_adsr"
+    parameters:
+      attack: 0.1
+      decay: 0.6
+      sustain: 0.0
+      release: 1.5
+
+  vca1:
+    type: "vca"
+    parameters:
+      gain: 0.8
+
+  output:
+    type: "output_wav"
+    parameters:
+      filename: "multi_osc_output.wav"
+
+connections:
+  - from: "osc1.0"
+    to: "mixer1.0"
+  - from: "osc2.0"
+    to: "mixer1.1"
+  - from: "osc3.0"
+    to: "mixer1.2"
+  - from: "mixer1.0"
+    to: "vca1.0"
+  - from: "env1.0"
+    to: "vca1.1"
+  - from: "vca1.0"
+    to: "output.0"
+
+sequence:
+  - time: 0.0
+    action: "trigger"
+    target: "env1"
+  - time: 2.5
+    action: "release"
+    target: "env1"

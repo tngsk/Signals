@@ -76,6 +76,9 @@ class SynthEngine:
             self.current_patch = patch
             self.current_graph = ModuleGraph(patch)
             
+            # Configure envelopes with auto duration detection
+            self._configure_envelope_durations()
+            
             return patch
             
         except (PatchError, GraphError) as e:
@@ -99,6 +102,9 @@ class SynthEngine:
             
             self.current_patch = patch
             self.current_graph = ModuleGraph(patch)
+            
+            # Configure envelopes with auto duration detection
+            self._configure_envelope_durations()
             
             return patch
             
@@ -128,9 +134,20 @@ class SynthEngine:
         try:
             # Determine duration
             if duration is None:
-                duration = self.current_patch.get_duration()
-                if duration == 0.0:
-                    duration = 2.0  # Default duration
+                sequence_duration = self.current_patch.get_duration()
+                if sequence_duration == 0.0:
+                    sequence_duration = 2.0  # Default duration
+            
+                # Calculate additional time needed for envelope release phases
+                max_release_time = 0.0
+                for module_id, module_data in self.current_patch.modules.items():
+                    if module_data['type'] == 'envelope_adsr':
+                        envelope_module = self.current_graph.get_module(module_id)
+                        if envelope_module and hasattr(envelope_module, 'release_time'):
+                            max_release_time = max(max_release_time, envelope_module.release_time)
+            
+                # Total duration includes sequence time plus envelope release completion
+                duration = sequence_duration + max_release_time
             
             # Process the graph
             all_outputs = self.current_graph.process_duration(duration, progress_callback)
@@ -205,7 +222,7 @@ class SynthEngine:
             audio_data: Audio samples as numpy array
             bits_per_sample: Bit depth (16, 24, or 32)
         """
-        from .dsp import write_wav
+        from ..core import write_wav
         
         try:
             write_wav(str(filename), audio_data, self.sample_rate, bits_per_sample)
@@ -384,6 +401,47 @@ class SynthEngine:
                 results.append(result)
         
         return results
+    
+    def _configure_envelope_durations(self):
+        """Configure envelope modules with auto duration detection."""
+        if not self.current_patch or not self.current_graph:
+            return
+        
+        # Detect total duration from patch sequence
+        total_duration = self.current_patch.get_duration()
+        if total_duration == 0.0:
+            total_duration = 2.0  # Default duration
+        
+        # Find the maximum release time needed and extend total duration accordingly
+        max_release_extension = 0.0
+        
+        # First pass: calculate envelope durations to determine maximum release extension
+        for module_id, module_data in self.current_patch.modules.items():
+            if module_data['type'] == 'envelope_adsr':
+                # Calculate release time based on parameters
+                params = module_data['parameters']
+                release_param = params.get('release', 0.2)
+                
+                if release_param == "auto":
+                    # For auto release, estimate based on reasonable default
+                    estimated_release = total_duration * 0.3  # 30% of total
+                elif isinstance(release_param, str) and release_param.endswith('%'):
+                    percentage = float(release_param[:-1])
+                    estimated_release = total_duration * (percentage / 100.0)
+                else:
+                    estimated_release = float(release_param)
+                
+                max_release_extension = max(max_release_extension, estimated_release)
+        
+        # Extend total duration to include release completion
+        extended_duration = total_duration + max_release_extension
+        
+        # Configure all envelope modules with extended duration
+        for module_id, module_data in self.current_patch.modules.items():
+            if module_data['type'] == 'envelope_adsr':
+                envelope_module = self.current_graph.get_module(module_id)
+                if envelope_module and hasattr(envelope_module, 'set_total_duration'):
+                    envelope_module.set_total_duration(extended_duration)
     
     def cleanup(self):
         """Clean up engine resources."""

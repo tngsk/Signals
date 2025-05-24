@@ -1,0 +1,56 @@
+name: "Flexible Envelope Template"
+description: "Template demonstrating new envelope specification: float=seconds, %=percentage, auto=calculated"
+
+variables:
+  osc_freq: 440.0
+  osc_waveform: "sine"
+  env_attack: "auto"
+  env_decay: "25%"
+  env_sustain: 0.7
+  env_release: 1.2
+  note_duration: 4.0
+  output_filename: "flexible_envelope_output.wav"
+
+sample_rate: 48000
+
+modules:
+  osc1:
+    type: "oscillator"
+    parameters:
+      waveform: "{{ osc_waveform | default('sine') }}"
+      frequency: {{ osc_freq | default(440.0) }}
+      amplitude: 0.8
+      
+  env1:
+    type: "envelope_adsr"
+    parameters:
+      attack: "{{ env_attack | default('auto') }}"
+      decay: "{{ env_decay | default('auto') }}"
+      sustain: {{ env_sustain | default(0.7) }}
+      release: "{{ env_release | default('auto') }}"
+      
+  vca1:
+    type: "vca"
+    parameters:
+      gain: 1.0
+      
+  output:
+    type: "output_wav"
+    parameters:
+      filename: "{{ output_filename | default('flexible_envelope_output.wav') }}"
+
+connections:
+  - from: "osc1.0"
+    to: "vca1.0"
+  - from: "env1.0"
+    to: "vca1.1"
+  - from: "vca1.0"
+    to: "output.0"
+
+sequence:
+  - time: 0.0
+    action: "trigger"
+    target: "env1"
+  - time: {{ note_duration | default(3.0) }}
+    action: "release"
+    target: "env1"

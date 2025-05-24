@@ -17,6 +17,7 @@ from ..modules.oscillator import Oscillator, WaveformType
 from ..modules.envelope import EnvelopeADSR
 from ..modules.mixer import Mixer
 from ..modules.output import OutputWav
+from ..modules.vca import VCA
 
 
 class PatchError(Exception):
@@ -162,6 +163,7 @@ class Patch:
         'envelope_adsr': EnvelopeADSR,
         'mixer': Mixer,
         'output_wav': OutputWav,
+        'vca': VCA,
     }
     
     def __init__(self, name: str = "Untitled Patch", description: str = "",

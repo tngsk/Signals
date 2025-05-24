@@ -18,7 +18,7 @@ Example:
 
 # Import from reorganized structure
 from .core import Module, Signal, SignalType, ParameterType, write_wav
-from .modules import Oscillator, EnvelopeADSR, Mixer, OutputWav
+from .modules import Oscillator, EnvelopeADSR, Mixer, OutputWav, VCA
 from .processing import SynthEngine, ModuleGraph, Patch, PatchTemplate
 
 # Maintain backward compatibility with old imports
@@ -35,6 +35,7 @@ __all__ = [
     "EnvelopeADSR",
     "Mixer", 
     "OutputWav",
+    "VCA",
     
     # Processing engines
     "SynthEngine",

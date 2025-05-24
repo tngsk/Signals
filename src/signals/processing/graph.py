@@ -93,9 +93,10 @@ class ModuleGraph:
                 # Other modules take sample_rate as first parameter
                 module = module_class(self.sample_rate)
             
-            # Set module parameters
+            # Set module parameters (skip structural parameters that are handled during initialization)
+            structural_params = {'filename', 'num_inputs'}
             for param_name, param_value in module_data['parameters'].items():
-                if param_name != 'filename':  # Skip filename for output_wav
+                if param_name not in structural_params:
                     module.set_parameter(param_name, param_value)
             
             # Create graph node

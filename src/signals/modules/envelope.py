@@ -8,6 +8,8 @@ smooth transitions between different phases.
 """
 
 import numpy as np
+import re
+from typing import Union
 
 from ..core.module import Module, ParameterType, Signal, SignalType
 
@@ -44,10 +46,25 @@ class EnvelopeADSR(Module):
     def __init__(self, sample_rate: int):
         super().__init__(input_count=1, output_count=1)  # Input for trigger
         self.sample_rate = sample_rate
+        
+        # Original time-based parameters
         self.attack_time: float = 0.05  # seconds
         self.decay_time: float = 0.1  # seconds
         self.sustain_level: float = 0.7  # 0.0 to 1.0
         self.release_time: float = 0.2  # seconds
+        
+        # Enhanced parameter storage (raw values as entered by user)
+        self._attack_param: Union[str, float] = 0.05
+        self._decay_param: Union[str, float] = 0.1
+        self._release_param: Union[str, float] = 0.2
+        
+        # Total duration for relative calculations (set externally or auto-detected)
+        self._total_duration: float = 2.0  # Default duration
+        
+        # Auto mode calculation flags
+        self._auto_attack: bool = False
+        self._auto_decay: bool = False
+        self._auto_release: bool = False
 
         self._attack_samples: int = int(self.attack_time * self.sample_rate)
         self._decay_samples: int = int(self.decay_time * self.sample_rate)
@@ -60,31 +77,53 @@ class EnvelopeADSR(Module):
 
     def set_parameter(self, name: str, value: ParameterType):
         """
-        Set envelope parameters.
+        Set envelope parameters with enhanced support for relative values and auto mode.
 
         Args:
             name: Parameter name. Supported parameters:
-                - "attack": Attack time in seconds (>= 0.0)
-                - "decay": Decay time in seconds (>= 0.0)
+                - "attack": Attack time - supports multiple formats:
+                  * Seconds: 0.05 (any float/int value)
+                  * Percentage: "5%" (percentage of total duration)
+                  * Auto: "auto" (calculated from other parameters and total duration)
+                - "decay": Decay time (same formats as attack)
                 - "sustain": Sustain level (0.0 to 1.0)
-                - "release": Release time in seconds (>= 0.0)
-            value: Parameter value
+                - "release": Release time (same formats as attack)
+                - "total_duration": Set total duration for relative calculations
+            value: Parameter value in various formats
 
-        Note:
-            Parameter changes take effect immediately and may cause
-            audible clicks if changed during active envelope phases.
+        Examples:
+            >>> env.set_parameter("attack", "5%")      # 5% of total duration
+            >>> env.set_parameter("decay", "auto")     # Auto-calculated
+            >>> env.set_parameter("release", 1.5)      # 1.5 seconds
+            >>> env.set_parameter("attack", 0.05)      # 0.05 seconds
         """
         if name == "attack":
-            self.attack_time = float(value)
-            self._attack_samples = int(self.attack_time * self.sample_rate)
+            self._attack_param = value
+            self._auto_attack = (value == "auto")
+            if not self._auto_attack:
+                self.attack_time = self._parse_time_parameter(value)
+                self._attack_samples = int(self.attack_time * self.sample_rate)
+            self._recalculate_auto_times()
         elif name == "decay":
-            self.decay_time = float(value)
-            self._decay_samples = int(self.decay_time * self.sample_rate)
+            self._decay_param = value
+            self._auto_decay = (value == "auto")
+            if not self._auto_decay:
+                self.decay_time = self._parse_time_parameter(value)
+                self._decay_samples = int(self.decay_time * self.sample_rate)
+            self._recalculate_auto_times()
         elif name == "sustain":
             self.sustain_level = float(value)
         elif name == "release":
-            self.release_time = float(value)
-            self._release_samples = int(self.release_time * self.sample_rate)
+            self._release_param = value
+            self._auto_release = (value == "auto")
+            if not self._auto_release:
+                self.release_time = self._parse_time_parameter(value)
+                self._release_samples = int(self.release_time * self.sample_rate)
+            self._recalculate_auto_times()
+        elif name == "total_duration":
+            self._total_duration = float(value)
+            # Recalculate all relative parameters
+            self._recalculate_times()
         else:
             print(f"Warning: Unknown parameter {name} for EnvelopeADSR")
 
@@ -195,3 +234,136 @@ class EnvelopeADSR(Module):
             self._current_sample += 1
 
         return [Signal(SignalType.CONTROL, np.clip(self._value, 0.0, 1.0))]
+    
+    def _parse_time_parameter(self, value: Union[str, float]) -> float:
+        """
+        Parse a time parameter that can be in various formats.
+        
+        Args:
+            value: Parameter value (string or number)
+            
+        Returns:
+            Time in seconds
+        """
+        if isinstance(value, str):
+            value_str = value.strip()
+            
+            # Percentage format (e.g., "5%", "20%")
+            if value_str.endswith('%'):
+                try:
+                    percentage = float(value_str[:-1])
+                    return self._total_duration * (percentage / 100.0)
+                except ValueError:
+                    print(f"Warning: Invalid percentage format '{value}', using 0.1 seconds")
+                    return 0.1
+            
+            # Try to parse as plain number string (treat as seconds)
+            try:
+                return float(value_str)
+            except ValueError:
+                print(f"Warning: Unable to parse time parameter '{value}', using 0.1 seconds")
+                return 0.1
+        
+        elif isinstance(value, (int, float)):
+            # All numeric values are treated as seconds
+            return float(value)
+        
+        else:
+            print(f"Warning: Invalid time parameter type for '{value}', using 0.1 seconds")
+            return 0.1
+    
+    def _recalculate_times(self):
+        """Recalculate all time parameters when total_duration changes."""
+        if not self._auto_attack:
+            self.attack_time = self._parse_time_parameter(self._attack_param)
+            self._attack_samples = int(self.attack_time * self.sample_rate)
+        
+        if not self._auto_decay:
+            self.decay_time = self._parse_time_parameter(self._decay_param)
+            self._decay_samples = int(self.decay_time * self.sample_rate)
+        
+        if not self._auto_release:
+            self.release_time = self._parse_time_parameter(self._release_param)
+            self._release_samples = int(self.release_time * self.sample_rate)
+        
+        self._recalculate_auto_times()
+    
+    def _recalculate_auto_times(self):
+        """Recalculate auto parameters based on total duration and other set parameters."""
+        # Calculate the total used time by non-auto parameters
+        used_time = 0.0
+        auto_count = 0
+        
+        if not self._auto_attack:
+            used_time += self.attack_time
+        else:
+            auto_count += 1
+        
+        if not self._auto_decay:
+            used_time += self.decay_time
+        else:
+            auto_count += 1
+        
+        if not self._auto_release:
+            used_time += self.release_time
+        else:
+            auto_count += 1
+        
+        # Calculate remaining time for auto parameters
+        if auto_count > 0:
+            # Reserve some time for sustain (minimum 10% of total duration)
+            reserved_sustain_time = max(0.1 * self._total_duration, 0.1)
+            available_time = max(0.0, self._total_duration - used_time - reserved_sustain_time)
+            auto_time_each = available_time / auto_count if auto_count > 0 else 0.0
+            
+            # Ensure minimum time for each auto parameter
+            auto_time_each = max(auto_time_each, 0.01)  # Minimum 10ms
+            
+
+            
+            if self._auto_attack:
+                self.attack_time = auto_time_each
+                self._attack_samples = int(self.attack_time * self.sample_rate)
+            
+            if self._auto_decay:
+                self.decay_time = auto_time_each
+                self._decay_samples = int(self.decay_time * self.sample_rate)
+            
+            if self._auto_release:
+                self.release_time = auto_time_each
+                self._release_samples = int(self.release_time * self.sample_rate)
+    
+    def set_total_duration(self, duration: float):
+        """
+        Set the total duration for relative calculations.
+        
+        Args:
+            duration: Total duration in seconds
+        """
+        self._total_duration = duration
+        self._recalculate_times()
+        
+
+    
+    def get_info(self) -> dict:
+        """
+        Get current envelope information including calculated times.
+        
+        Returns:
+            Dictionary with envelope state and calculated values
+        """
+        return {
+            'attack_time': self.attack_time,
+            'decay_time': self.decay_time,
+            'sustain_level': self.sustain_level,
+            'release_time': self.release_time,
+            'total_duration': self._total_duration,
+            'attack_param': self._attack_param,
+            'decay_param': self._decay_param,
+            'release_param': self._release_param,
+            'auto_attack': self._auto_attack,
+            'auto_decay': self._auto_decay,
+            'auto_release': self._auto_release,
+            'current_phase': self._phase,
+            'current_value': self._value
+        }

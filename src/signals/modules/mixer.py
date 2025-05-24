@@ -55,6 +55,7 @@ class Mixer(Module):
                 self.gains[input_idx] = float(value)
             else:
                 print(f"Warning: Gain index {input_idx+1} out of range for Mixer")
+
         else:
             print(f"Warning: Unknown parameter {name} for Mixer")
 

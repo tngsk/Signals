@@ -1,5 +1,5 @@
-name: "Parametric Synthesizer"
-description: "Template synthesizer with variable parameters for exploration"
+name: "Parametric Synthesizer with VCA"
+description: "Template synthesizer with variable parameters for exploration using VCA for proper amplitude control"
 
 variables:
   osc_freq: 440.0
@@ -30,6 +30,11 @@ modules:
       sustain: {{ env_sustain | default(0.0) }}
       release: {{ env_release | default(0.1) }}
       
+  vca1:
+    type: "vca"
+    parameters:
+      gain: 1.0
+      
   output:
     type: "output_wav"
     parameters:
@@ -37,8 +42,10 @@ modules:
 
 connections:
   - from: "osc1.0"
-    to: "env1.0"
-  - from: "env1.0" 
+    to: "vca1.0"
+  - from: "env1.0"
+    to: "vca1.1"
+  - from: "vca1.0"
     to: "output.0"
 
 sequence:

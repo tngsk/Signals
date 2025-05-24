@@ -81,7 +81,12 @@ def write_wav(
             scaled_samples = (samples * 32767).astype(np.int16)
             for sample in scaled_samples:
                 wf.writeframesraw(struct.pack("<h", sample))
-        # Add 24-bit and 32-bit float support later if needed
-        else:  # For 32-bit float (though wave module might not fully support it directly for all players)
-            for sample in samples.astype(np.float32):  # wave module expects bytes
-                wf.writeframesraw(sample.tobytes())
+        elif bits_per_sample == 24:
+            scaled_samples = (samples * 8388607).astype(np.int32)
+            for sample in scaled_samples:
+                # Pack as 3 bytes (24-bit) in little-endian format
+                sample_bytes = sample.to_bytes(4, byteorder='little', signed=True)[:3]
+                wf.writeframesraw(sample_bytes)
+        else:  # 32-bit float
+            for sample in samples.astype(np.float32):
+                wf.writeframesraw(struct.pack("<f", sample))

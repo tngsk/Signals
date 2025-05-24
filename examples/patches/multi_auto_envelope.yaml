@@ -1,5 +1,5 @@
-name: "Basic Synthesizer with VCA"
-description: "Simple oscillator with ADSR envelope using VCA for proper amplitude control"
+name: "Multiple Auto Parameters Test"
+description: "Test patch with multiple auto parameters to verify auto-calculation logic"
 sample_rate: 48000
 
 modules:
@@ -9,24 +9,24 @@ modules:
       waveform: "sine"
       frequency: 440.0
       amplitude: 0.8
-
+      
   env1:
     type: "envelope_adsr"
     parameters:
-      attack: 0.02
-      decay: 0.8
-      sustain: 0.1
-      release: 0.5
-
+      attack: "auto"    # Auto-calculated
+      decay: 0.5        # 0.5 seconds (fixed)
+      sustain: 0.7
+      release: "auto"   # Auto-calculated
+      
   vca1:
     type: "vca"
     parameters:
       gain: 1.0
-
+      
   output:
     type: "output_wav"
     parameters:
-      filename: "basic_synth_output.wav"
+      filename: "multi_auto_envelope_output.wav"
 
 connections:
   - from: "osc1.0"
@@ -40,6 +40,6 @@ sequence:
   - time: 0.0
     action: "trigger"
     target: "env1"
-  - time: 1.5
+  - time: 3.5
     action: "release"
     target: "env1"

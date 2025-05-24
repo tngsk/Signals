@@ -1,5 +1,5 @@
-name: "Basic Synthesizer with VCA"
-description: "Simple oscillator with ADSR envelope using VCA for proper amplitude control"
+name: "Enhanced Envelope Test"
+description: "Test patch demonstrating relative values and auto parameters for envelopes"
 sample_rate: 48000
 
 modules:
@@ -9,24 +9,24 @@ modules:
       waveform: "sine"
       frequency: 440.0
       amplitude: 0.8
-
+      
   env1:
     type: "envelope_adsr"
     parameters:
-      attack: 0.02
-      decay: 0.8
-      sustain: 0.1
-      release: 0.5
-
+      attack: "5%"      # 5% of total duration
+      decay: "auto"     # Musical default (20% of total)
+      sustain: 0.6
+      release: "30%"    # 30% of total duration
+      
   vca1:
     type: "vca"
     parameters:
       gain: 1.0
-
+      
   output:
     type: "output_wav"
     parameters:
-      filename: "basic_synth_output.wav"
+      filename: "enhanced_envelope_output.wav"
 
 connections:
   - from: "osc1.0"
@@ -40,6 +40,6 @@ sequence:
   - time: 0.0
     action: "trigger"
     target: "env1"
-  - time: 1.5
+  - time: 3.0
     action: "release"
     target: "env1"
