@@ -10,9 +10,9 @@ import yaml
 import numpy as np
 
 from signals import SynthEngine, Patch, PatchTemplate, ModuleGraph
-from signals.patch import PatchError, PatchValidationError, PatchTemplateError
-from signals.graph import GraphError, CyclicGraphError
-from signals.engine import EngineError
+from signals.processing.patch import PatchError, PatchValidationError, PatchTemplateError
+from signals.processing.graph import GraphError, CyclicGraphError
+from signals.processing.engine import EngineError
 
 
 class TestPatch:
