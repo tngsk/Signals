@@ -12,11 +12,11 @@ from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 import re
 
-from .module import Module, Signal, SignalType
-from .oscillator import Oscillator, WaveformType
-from .envelope import EnvelopeADSR
-from .mixer import Mixer
-from .output import OutputWav
+from ..core.module import Module, Signal, SignalType
+from ..modules.oscillator import Oscillator, WaveformType
+from ..modules.envelope import EnvelopeADSR
+from ..modules.mixer import Mixer
+from ..modules.output import OutputWav
 
 
 class PatchError(Exception):

@@ -9,7 +9,7 @@ from typing import Dict, List, Set, Any, Optional, Tuple
 from collections import defaultdict, deque
 import time
 
-from .module import Module, Signal, SignalType
+from ..core.module import Module, Signal, SignalType
 from .patch import Patch, Connection, SequenceEvent
 
 
@@ -80,12 +80,17 @@ class ModuleGraph:
             module_type = module_data['type']
             module_class = self.patch.MODULE_REGISTRY[module_type]
             
-            # Create module instance with sample rate
+            # Create module instance with appropriate parameters
             if module_type == 'output_wav':
                 # OutputWav needs filename parameter
                 filename = module_data['parameters'].get('filename', f'output_{module_id}.wav')
                 module = module_class(filename, self.sample_rate)
+            elif module_type == 'mixer':
+                # Mixer needs num_inputs parameter, not sample_rate
+                num_inputs = module_data['parameters'].get('num_inputs', 2)
+                module = module_class(num_inputs=num_inputs)
             else:
+                # Other modules take sample_rate as first parameter
                 module = module_class(self.sample_rate)
             
             # Set module parameters
@@ -186,10 +191,10 @@ class ModuleGraph:
         # Process sequence events for current time
         self._process_sequence_events()
         
-        # Process modules in execution order
+        # Process modules in execution order (optimized version)
         outputs = {}
         for module_id in self.execution_order:
-            node_outputs = self._process_node(module_id)
+            node_outputs = self._process_node_optimized(module_id, outputs)
             outputs[module_id] = node_outputs
         
         # Advance time
@@ -245,6 +250,46 @@ class ModuleGraph:
                     inputs.append(source_outputs[output_idx])
                 else:
                     # Provide default signal if output doesn't exist
+                    inputs.append(Signal(SignalType.AUDIO, 0.0))
+            else:
+                # Provide default signal for unconnected inputs
+                inputs.append(Signal(SignalType.AUDIO, 0.0))
+        
+        # Process the module
+        if inputs or node.module.input_count == 0:
+            outputs = node.module.process(inputs if inputs else None)
+        else:
+            outputs = node.module.process()
+        
+        # Cache outputs and mark as processed
+        node.cached_outputs = outputs
+        node.processed_this_cycle = True
+        
+        return outputs
+
+    def _process_node_optimized(self, module_id: str, processed_outputs: Dict[str, List[Signal]]) -> List[Signal]:
+        """Process a single node using already computed outputs (optimized version)."""
+        node = self.nodes[module_id]
+        
+        # Skip if already processed this cycle
+        if node.processed_this_cycle:
+            return node.cached_outputs or []
+        
+        # Gather inputs from already processed modules
+        inputs = []
+        for input_idx in range(node.module.input_count):
+            if input_idx in node.input_connections:
+                source_id, output_idx = node.input_connections[input_idx]
+                
+                # Use already computed outputs instead of recursive processing
+                if source_id in processed_outputs:
+                    source_outputs = processed_outputs[source_id]
+                    if output_idx < len(source_outputs):
+                        inputs.append(source_outputs[output_idx])
+                    else:
+                        inputs.append(Signal(SignalType.AUDIO, 0.0))
+                else:
+                    # Source not yet processed - provide default signal
                     inputs.append(Signal(SignalType.AUDIO, 0.0))
             else:
                 # Provide default signal for unconnected inputs

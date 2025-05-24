@@ -8,8 +8,8 @@ bit depths and includes functionality for adding silence to recordings.
 
 import numpy as np
 
-from .dsp import generate_silence, write_wav
-from .module import Module, Signal, SignalType
+from ..core.dsp import generate_silence, write_wav
+from ..core.module import Module, Signal, SignalType
 
 
 class OutputWav(Module):

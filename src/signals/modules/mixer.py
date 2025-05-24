@@ -6,7 +6,7 @@ into a single output signal. Each input channel has an independent gain control
 for level adjustment and creative mixing effects.
 """
 
-from .module import Module, ParameterType, Signal, SignalType
+from ..core.module import Module, ParameterType, Signal, SignalType
 
 
 class Mixer(Module):

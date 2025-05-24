@@ -9,7 +9,7 @@ smooth transitions between different phases.
 
 import numpy as np
 
-from .module import Module, ParameterType, Signal, SignalType
+from ..core.module import Module, ParameterType, Signal, SignalType
 
 
 class EnvelopeADSR(Module):

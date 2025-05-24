@@ -181,3 +181,19 @@ cython_debug/
 
 # Tech Note
 .note/
+
+# Temporary files
+temp/
+*.tmp
+*.temp
+
+# Generated audio files
+*.wav
+*.mp3
+*.flac
+*.aiff
+
+# Debug and demo generated files
+debug_*.yaml
+demo_*.yaml
+perf_test.yaml

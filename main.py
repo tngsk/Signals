@@ -8,7 +8,7 @@ various synthesizer components including oscillators, envelopes, and output modu
 import numpy as np
 import argparse
 from signals import Oscillator, EnvelopeADSR, Mixer, OutputWav, Signal, SignalType
-from signals.oscillator import WaveformType
+from signals.modules.oscillator import WaveformType
 
 def main():
     """

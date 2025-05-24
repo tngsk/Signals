@@ -13,7 +13,7 @@ import time
 
 from .patch import Patch, PatchTemplate, PatchError
 from .graph import ModuleGraph, GraphError
-from .module import Signal, SignalType
+from ..core.module import Signal, SignalType
 
 
 class EngineError(Exception):
