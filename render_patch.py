@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from signals import SynthEngine, PatchTemplate
 from signals.processing.patch import PatchError
 from signals.processing.engine import EngineError
+from signals.core.logging import configure_logging, get_logger
 
 
 def parse_variables(vars_string):
@@ -109,20 +110,66 @@ Examples:
         help='Suppress output messages'
     )
     
+    parser.add_argument(
+        '--log-level', '-l',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+        default='WARNING',
+        help='Set logging level (default: WARNING)'
+    )
+    
+    parser.add_argument(
+        '--log-file',
+        help='Optional log file path'
+    )
+    
+    parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Enable verbose logging (sets log level to INFO)'
+    )
+    
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Enable debug logging (sets log level to DEBUG)'
+    )
+    
     args = parser.parse_args()
+    
+    # Configure logging based on arguments
+    log_level = args.log_level
+    if args.debug:
+        log_level = 'DEBUG'
+    elif args.verbose:
+        log_level = 'INFO'
+    elif args.quiet:
+        log_level = 'ERROR'
+    
+    configure_logging(
+        level=log_level,
+        console=not args.quiet,
+        file_path=args.log_file,
+        performance_logging=args.debug
+    )
+    
+    logger = get_logger('render_patch')
+    logger.info(f"Starting render_patch with log level: {log_level}")
     
     # Validate patch file
     patch_path = Path(args.patch_file)
     if not patch_path.exists():
+        logger.error(f"Patch file '{patch_path}' not found")
         print(f"Error: Patch file '{patch_path}' not found", file=sys.stderr)
         return 1
     
     if not patch_path.suffix.lower() in ['.yaml', '.yml']:
+        logger.error(f"Patch file must be a YAML file (.yaml or .yml)")
         print(f"Error: Patch file must be a YAML file (.yaml or .yml)", file=sys.stderr)
         return 1
     
     try:
         # Create engine
+        logger.info(f"Creating SynthEngine with sample_rate={args.sample_rate}")
         engine = SynthEngine(sample_rate=args.sample_rate)
         
         # Parse variables if provided
@@ -229,18 +276,23 @@ Examples:
             print(f"   Samples: {len(audio_data)}")
             print(f"   Sample rate: {args.sample_rate} Hz")
         
+        logger.info("Patch rendering completed successfully")
         return 0
         
     except PatchError as e:
+        logger.error(f"Patch error: {e}")
         print(f"Patch error: {e}", file=sys.stderr)
         return 1
     except EngineError as e:
+        logger.error(f"Engine error: {e}")
         print(f"Engine error: {e}", file=sys.stderr)
         return 1
     except FileNotFoundError as e:
+        logger.error(f"File error: {e}")
         print(f"File error: {e}", file=sys.stderr)
         return 1
     except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
         print(f"Unexpected error: {e}", file=sys.stderr)
         import traceback
         if not args.quiet:

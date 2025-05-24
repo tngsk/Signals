@@ -12,6 +12,7 @@ import re
 from typing import Union
 
 from ..core.module import Module, ParameterType, Signal, SignalType
+from ..core.logging import get_logger, performance_logger, log_module_state
 
 
 class EnvelopeADSR(Module):
@@ -46,6 +47,7 @@ class EnvelopeADSR(Module):
     def __init__(self, sample_rate: int):
         super().__init__(input_count=1, output_count=1)  # Input for trigger
         self.sample_rate = sample_rate
+        self.logger = get_logger('modules.envelope')
         
         # Original time-based parameters
         self.attack_time: float = 0.05  # seconds
@@ -74,6 +76,8 @@ class EnvelopeADSR(Module):
         self._current_sample: int = 0
         self._value: float = 0.0
         self._note_on: bool = False
+        
+        self.logger.debug(f"EnvelopeADSR initialized: sample_rate={sample_rate}")
 
     def set_parameter(self, name: str, value: ParameterType):
         """
@@ -104,6 +108,7 @@ class EnvelopeADSR(Module):
                 self.attack_time = self._parse_time_parameter(value)
                 self._attack_samples = int(self.attack_time * self.sample_rate)
             self._recalculate_auto_times()
+            self.logger.debug(f"Attack parameter set: {value} -> {self.attack_time:.3f}s")
         elif name == "decay":
             self._decay_param = value
             self._auto_decay = (value == "auto")
@@ -111,8 +116,10 @@ class EnvelopeADSR(Module):
                 self.decay_time = self._parse_time_parameter(value)
                 self._decay_samples = int(self.decay_time * self.sample_rate)
             self._recalculate_auto_times()
+            self.logger.debug(f"Decay parameter set: {value} -> {self.decay_time:.3f}s")
         elif name == "sustain":
             self.sustain_level = float(value)
+            self.logger.debug(f"Sustain level set: {value}")
         elif name == "release":
             self._release_param = value
             self._auto_release = (value == "auto")
@@ -120,12 +127,14 @@ class EnvelopeADSR(Module):
                 self.release_time = self._parse_time_parameter(value)
                 self._release_samples = int(self.release_time * self.sample_rate)
             self._recalculate_auto_times()
+            self.logger.debug(f"Release parameter set: {value} -> {self.release_time:.3f}s")
         elif name == "total_duration":
             self._total_duration = float(value)
             # Recalculate all relative parameters
             self._recalculate_times()
+            self.logger.info(f"Total duration set: {value}s, recalculating envelope times")
         else:
-            print(f"Warning: Unknown parameter {name} for EnvelopeADSR")
+            self.logger.warning(f"Unknown parameter {name} for EnvelopeADSR")
 
     def trigger_on(self):
         """
@@ -138,6 +147,7 @@ class EnvelopeADSR(Module):
         self._note_on = True
         self._phase = 1  # Attack
         self._current_sample = 0
+        self.logger.debug("Envelope triggered ON - starting attack phase")
 
     def trigger_off(self):
         """
@@ -155,7 +165,9 @@ class EnvelopeADSR(Module):
         if self._phase != 0:  # If not idle
             self._phase = 4  # Release
             self._current_sample = 0
+            self.logger.debug(f"Envelope triggered OFF - starting release phase from value {self._value:.3f}")
 
+    @performance_logger
     def process(self, inputs: list[Signal] | None = None) -> list[Signal]:
         """
         Process the envelope for one sample period.
@@ -254,14 +266,14 @@ class EnvelopeADSR(Module):
                     percentage = float(value_str[:-1])
                     return self._total_duration * (percentage / 100.0)
                 except ValueError:
-                    print(f"Warning: Invalid percentage format '{value}', using 0.1 seconds")
+                    self.logger.warning(f"Invalid percentage format '{value}', using 0.1 seconds")
                     return 0.1
             
             # Try to parse as plain number string (treat as seconds)
             try:
                 return float(value_str)
             except ValueError:
-                print(f"Warning: Unable to parse time parameter '{value}', using 0.1 seconds")
+                self.logger.warning(f"Unable to parse time parameter '{value}', using 0.1 seconds")
                 return 0.1
         
         elif isinstance(value, (int, float)):
@@ -269,7 +281,7 @@ class EnvelopeADSR(Module):
             return float(value)
         
         else:
-            print(f"Warning: Invalid time parameter type for '{value}', using 0.1 seconds")
+            self.logger.warning(f"Invalid time parameter type for '{value}', using 0.1 seconds")
             return 0.1
     
     def _recalculate_times(self):
@@ -343,7 +355,16 @@ class EnvelopeADSR(Module):
         self._total_duration = duration
         self._recalculate_times()
         
-
+        # Log the final envelope configuration
+        total_envelope_time = self.attack_time + self.decay_time + self.release_time
+        self.logger.info(f"Envelope timing configured - Total: {duration:.3f}s, "
+                        f"A:{self.attack_time:.3f}s, D:{self.decay_time:.3f}s, "
+                        f"S:{self.sustain_level:.2f}, R:{self.release_time:.3f}s, "
+                        f"ADSR_total: {total_envelope_time:.3f}s")
+        
+        if total_envelope_time > duration:
+            self.logger.warning(f"ADSR total ({total_envelope_time:.3f}s) exceeds "
+                              f"duration ({duration:.3f}s) by {total_envelope_time - duration:.3f}s")
     
     def get_info(self) -> dict:
         """

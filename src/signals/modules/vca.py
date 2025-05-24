@@ -7,6 +7,7 @@ envelopes, LFOs, or other modulation sources.
 """
 
 from ..core.module import Module, ParameterType, Signal, SignalType
+from ..core.logging import get_logger, performance_logger, log_module_state
 
 
 class VCA(Module):
@@ -35,6 +36,9 @@ class VCA(Module):
         super().__init__(input_count=2, output_count=1)  # Audio input + CV input
         self.sample_rate = sample_rate
         self.gain: float = 1.0
+        self.logger = get_logger('modules.vca')
+        
+        self.logger.debug(f"VCA initialized: sample_rate={sample_rate}")
 
     def set_parameter(self, name: str, value: ParameterType):
         """
@@ -50,10 +54,13 @@ class VCA(Module):
             The final output is: input_audio * gain * control_voltage
         """
         if name == "gain":
+            old_gain = self.gain
             self.gain = float(value)
+            self.logger.debug(f"Gain changed: {old_gain:.3f} -> {self.gain:.3f}")
         else:
-            print(f"Warning: Unknown parameter {name} for VCA")
+            self.logger.warning(f"Unknown parameter {name} for VCA")
 
+    @performance_logger
     def process(self, inputs: list[Signal] | None = None) -> list[Signal]:
         """
         Apply voltage controlled amplification to the input audio signal.

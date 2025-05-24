@@ -12,6 +12,7 @@ from enum import Enum
 import numpy as np
 
 from ..core.module import Module, ParameterType, Signal, SignalType
+from ..core.logging import get_logger, performance_logger, log_module_state
 
 
 class WaveformType(Enum):
@@ -68,6 +69,9 @@ class Oscillator(Module):
         self.frequency: float = 440.0
         self.phase: float = 0.0
         self.amplitude: float = 1.0
+        self.logger = get_logger('modules.oscillator')
+        
+        self.logger.debug(f"Oscillator initialized: sample_rate={sample_rate}, waveform={waveform.value}")
 
     def set_parameter(self, name: str, value: ParameterType):
         """
@@ -85,17 +89,24 @@ class Oscillator(Module):
             Waveform changes are applied on the next process() call.
         """
         if name == "frequency":
+            old_freq = self.frequency
             self.frequency = float(value)
+            self.logger.debug(f"Frequency changed: {old_freq:.1f}Hz -> {self.frequency:.1f}Hz")
         elif name == "amplitude":
+            old_amp = self.amplitude
             self.amplitude = float(value)
+            self.logger.debug(f"Amplitude changed: {old_amp:.3f} -> {self.amplitude:.3f}")
         elif name == "waveform":
             try:
+                old_waveform = self.waveform
                 self.waveform = WaveformType(str(value).lower())
+                self.logger.debug(f"Waveform changed: {old_waveform.value} -> {self.waveform.value}")
             except ValueError:
-                print(f"Warning: Unknown waveform type {value}")
+                self.logger.warning(f"Unknown waveform type {value}")
         else:
-            print(f"Warning: Unknown parameter {name} for Oscillator")
+            self.logger.warning(f"Unknown parameter {name} for Oscillator")
 
+    @performance_logger
     def process(self, inputs: list[Signal] | None = None) -> list[Signal]:
         """
         Generate one sample of the current waveform.

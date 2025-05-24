@@ -14,6 +14,7 @@ import time
 from .patch import Patch, PatchTemplate, PatchError
 from .graph import ModuleGraph, GraphError
 from ..core.module import Signal, SignalType
+from ..core.logging import get_logger, performance_logger, log_module_state
 
 
 class EngineError(Exception):
@@ -42,6 +43,9 @@ class SynthEngine:
         self.current_patch: Optional[Patch] = None
         self.current_graph: Optional[ModuleGraph] = None
         self._processing_callbacks: List[Callable] = []
+        self.logger = get_logger('processing.engine')
+        
+        self.logger.info(f"SynthEngine initialized: sample_rate={sample_rate}Hz, buffer_size={buffer_size}")
     
     def load_patch(self, patch_file: Union[str, Path], 
                    variables: Optional[Dict[str, Any]] = None) -> Patch:
@@ -63,10 +67,12 @@ class SynthEngine:
             
             if variables is not None:
                 # Load as template
+                self.logger.info(f"Loading patch template: {patch_path} with variables: {variables}")
                 template = PatchTemplate(patch_path)
                 patch = template.instantiate(variables)
             else:
                 # Load as regular patch
+                self.logger.info(f"Loading patch: {patch_path}")
                 patch = Patch.from_file(patch_path)
             
             # Override sample rate from engine
@@ -79,11 +85,15 @@ class SynthEngine:
             # Configure envelopes with auto duration detection
             self._configure_envelope_durations()
             
+            self.logger.info(f"Patch loaded successfully: {patch.name} ({patch.get_module_count()} modules, {patch.get_connection_count()} connections)")
+            
             return patch
             
         except (PatchError, GraphError) as e:
+            self.logger.error(f"Failed to load patch: {e}")
             raise EngineError(f"Failed to load patch: {e}")
         except Exception as e:
+            self.logger.error(f"Unexpected error loading patch: {e}")
             raise EngineError(f"Unexpected error loading patch: {e}")
     
     def load_patch_from_dict(self, patch_data: Dict[str, Any]) -> Patch:
@@ -97,6 +107,7 @@ class SynthEngine:
             Loaded and validated Patch instance
         """
         try:
+            self.logger.info("Loading patch from dictionary data")
             patch = Patch.from_dict(patch_data)
             patch.sample_rate = self.sample_rate
             
@@ -106,11 +117,15 @@ class SynthEngine:
             # Configure envelopes with auto duration detection
             self._configure_envelope_durations()
             
+            self.logger.info(f"Patch loaded from dict: {patch.name} ({patch.get_module_count()} modules)")
+            
             return patch
             
         except (PatchError, GraphError) as e:
+            self.logger.error(f"Failed to load patch from dict: {e}")
             raise EngineError(f"Failed to load patch from dict: {e}")
     
+    @performance_logger
     def render(self, duration: Optional[float] = None, 
                output_file: Optional[Union[str, Path]] = None,
                progress_callback: Optional[Callable[[float], None]] = None) -> np.ndarray:
@@ -129,6 +144,7 @@ class SynthEngine:
             EngineError: If no patch is loaded or rendering fails
         """
         if not self.current_patch or not self.current_graph:
+            self.logger.error("No patch loaded. Call load_patch() first.")
             raise EngineError("No patch loaded. Call load_patch() first.")
         
         try:
@@ -148,8 +164,12 @@ class SynthEngine:
             
                 # Total duration includes sequence time plus envelope release completion
                 duration = sequence_duration + max_release_time
+                self.logger.info(f"Auto-calculated duration: {duration:.3f}s (sequence: {sequence_duration:.3f}s + release: {max_release_time:.3f}s)")
+            else:
+                self.logger.info(f"Using specified duration: {duration:.3f}s")
             
             # Process the graph
+            self.logger.debug(f"Starting audio rendering for {duration:.3f}s ({int(duration * self.sample_rate)} samples)")
             all_outputs = self.current_graph.process_duration(duration, progress_callback)
             
             # Extract audio from output modules
@@ -157,14 +177,18 @@ class SynthEngine:
             
             # Save to file if requested
             if output_file:
+                self.logger.info(f"Saving audio to: {output_file}")
                 self.save_audio(output_file, audio_data)
             
             # Finalize modules
             self.current_graph.finalize()
             
+            self.logger.info(f"Rendering completed: {len(audio_data)} samples generated")
+            
             return audio_data
             
         except Exception as e:
+            self.logger.error(f"Rendering failed: {e}")
             raise EngineError(f"Rendering failed: {e}")
     
     def _extract_audio_output(self, all_outputs: Dict[str, List[List[Signal]]], 
@@ -225,8 +249,11 @@ class SynthEngine:
         from ..core import write_wav
         
         try:
+            self.logger.debug(f"Saving {len(audio_data)} samples to {filename} ({bits_per_sample}-bit)")
             write_wav(str(filename), audio_data, self.sample_rate, bits_per_sample)
+            self.logger.info(f"Audio saved successfully: {filename}")
         except Exception as e:
+            self.logger.error(f"Failed to save audio: {e}")
             raise EngineError(f"Failed to save audio: {e}")
     
     def set_module_parameter(self, module_id: str, param_name: str, value: Any):
@@ -242,11 +269,14 @@ class SynthEngine:
             EngineError: If no patch is loaded or module not found
         """
         if not self.current_graph:
+            self.logger.error("No patch loaded. Call load_patch() first.")
             raise EngineError("No patch loaded. Call load_patch() first.")
         
         try:
+            self.logger.debug(f"Setting parameter: {module_id}.{param_name} = {value}")
             self.current_graph.set_module_parameter(module_id, param_name, value)
         except Exception as e:
+            self.logger.error(f"Failed to set parameter {module_id}.{param_name}: {e}")
             raise EngineError(f"Failed to set parameter: {e}")
     
     def get_module_parameters(self, module_id: str) -> Dict[str, Any]:
@@ -414,10 +444,12 @@ class SynthEngine:
         
         # Find the maximum release time needed and extend total duration accordingly
         max_release_extension = 0.0
+        envelope_count = 0
         
         # First pass: calculate envelope durations to determine maximum release extension
         for module_id, module_data in self.current_patch.modules.items():
             if module_data['type'] == 'envelope_adsr':
+                envelope_count += 1
                 # Calculate release time based on parameters
                 params = module_data['parameters']
                 release_param = params.get('release', 0.2)
@@ -436,12 +468,17 @@ class SynthEngine:
         # Extend total duration to include release completion
         extended_duration = total_duration + max_release_extension
         
+        if envelope_count > 0:
+            self.logger.info(f"Configuring {envelope_count} envelope(s): base_duration={total_duration:.3f}s, "
+                           f"max_release={max_release_extension:.3f}s, extended_duration={extended_duration:.3f}s")
+        
         # Configure all envelope modules with extended duration
         for module_id, module_data in self.current_patch.modules.items():
             if module_data['type'] == 'envelope_adsr':
                 envelope_module = self.current_graph.get_module(module_id)
                 if envelope_module and hasattr(envelope_module, 'set_total_duration'):
                     envelope_module.set_total_duration(extended_duration)
+                    self.logger.debug(f"Configured envelope {module_id} with duration {extended_duration:.3f}s")
     
     def cleanup(self):
         """Clean up engine resources."""
