@@ -1,0 +1,50 @@
+name: "Parametric Synthesizer"
+description: "Template synthesizer with variable parameters for exploration"
+
+variables:
+  osc_freq: 440.0
+  osc_waveform: "sine"
+  env_attack: 0.02
+  env_decay: 0.8
+  env_sustain: 0.0
+  env_release: 0.1
+  note_on_time: 0.0
+  note_off_time: 1.5
+  output_filename: "parametric_output.wav"
+
+sample_rate: 48000
+
+modules:
+  osc1:
+    type: "oscillator"
+    parameters:
+      waveform: "{{ osc_waveform | default('sine') }}"
+      frequency: {{ osc_freq | default(440.0) }}
+      amplitude: 0.8
+      
+  env1:
+    type: "envelope_adsr"
+    parameters:
+      attack: {{ env_attack | default(0.02) }}
+      decay: {{ env_decay | default(0.8) }}
+      sustain: {{ env_sustain | default(0.0) }}
+      release: {{ env_release | default(0.1) }}
+      
+  output:
+    type: "output_wav"
+    parameters:
+      filename: "{{ output_filename | default('parametric_output.wav') }}"
+
+connections:
+  - from: "osc1.0"
+    to: "env1.0"
+  - from: "env1.0" 
+    to: "output.0"
+
+sequence:
+  - time: {{ note_on_time | default(0.0) }}
+    action: "trigger"
+    target: "env1"
+  - time: {{ note_off_time | default(1.5) }}
+    action: "release"
+    target: "env1"

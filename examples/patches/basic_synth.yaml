@@ -1,0 +1,38 @@
+name: "Basic Synthesizer"
+description: "Simple oscillator with ADSR envelope"
+sample_rate: 48000
+
+modules:
+  osc1:
+    type: "oscillator"
+    parameters:
+      waveform: "sine"
+      frequency: 440.0
+      amplitude: 0.8
+      
+  env1:
+    type: "envelope_adsr"
+    parameters:
+      attack: 0.02
+      decay: 0.8
+      sustain: 0.0
+      release: 0.1
+      
+  output:
+    type: "output_wav"
+    parameters:
+      filename: "basic_synth_output.wav"
+
+connections:
+  - from: "osc1.0"
+    to: "env1.0"
+  - from: "env1.0" 
+    to: "output.0"
+
+sequence:
+  - time: 0.0
+    action: "trigger"
+    target: "env1"
+  - time: 1.5
+    action: "release"
+    target: "env1"

@@ -21,8 +21,11 @@ Example:
 """
 
 from .dsp import write_wav
+from .engine import SynthEngine
 from .envelope import EnvelopeADSR
+from .graph import ModuleGraph
 from .mixer import Mixer
 from .module import Module, ParameterType, Signal, SignalType
 from .oscillator import Oscillator
 from .output import OutputWav
+from .patch import Patch, PatchTemplate
