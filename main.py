@@ -1,9 +1,33 @@
+"""
+Signal processing synthesizer application.
+
+This module provides a command-line interface for generating audio signals using
+various synthesizer components including oscillators, envelopes, and output modules.
+"""
+
 import numpy as np
 import argparse
 from signals import Oscillator, EnvelopeADSR, Mixer, OutputWav, Signal, SignalType
 from signals.oscillator import WaveformType
 
 def main():
+    """
+    Main entry point for the signal generator application.
+    
+    Generates a 2-second audio file with a 440Hz sine wave modulated by an ADSR envelope.
+    Optionally adds silence at the beginning based on command line arguments.
+    
+    The audio processing pipeline consists of:
+    1. Oscillator generating a sine wave at 440Hz (A4)
+    2. ADSR envelope with configurable attack, decay, sustain, and release
+    3. Audio output to WAV file
+    
+    Command line arguments:
+        --silence: Duration of silence to add at the start (in seconds)
+    
+    Output:
+        Creates 'output_phase1.wav' file in the current directory
+    """
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Generate a sound with optional silence at the start')
     parser.add_argument('--silence', type=float, default=0.0,
