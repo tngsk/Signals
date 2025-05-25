@@ -84,7 +84,7 @@ def demo_frequency_sweep():
         
         # Lowpass filter with high resonance
         filt = Filter(filter_type=FilterType.LOWPASS)
-        filt.set_parameter("resonance", 5.0)  # High Q for dramatic effect
+        filt.set_parameter("resonance", 3.0)  # High Q for dramatic effect
         
         audio_buffer = []
         duration = 8.0  # 8 seconds
@@ -124,9 +124,9 @@ def demo_resonance_sweep():
         duration_samples = int(duration * 48000)
         
         for i in range(duration_samples):
-            # Resonance sweep from 0.5 to 8.0
+            # Resonance sweep from 0.5 to 5.0
             progress = i / duration_samples
-            resonance = 0.5 + progress * 7.5
+            resonance = 0.5 + progress * 4.5
             filt.set_parameter("resonance", resonance)
             
             osc_signal = osc.process()[0]
@@ -206,7 +206,7 @@ def demo_filter_oscillation():
         osc.set_parameter("amplitude", 0.01)  # Very quiet
         
         filt = Filter(filter_type=FilterType.LOWPASS)
-        filt.set_parameter("resonance", 15.0)  # Very high Q
+        filt.set_parameter("resonance", 8.0)  # High Q but stable
         
         audio_buffer = []
         duration = 4.0
@@ -252,7 +252,7 @@ def demo_multi_oscillator_filtering():
         # Bandpass filter to isolate middle frequency
         filt = Filter(filter_type=FilterType.BANDPASS)
         filt.set_parameter("cutoff_frequency", 440.0)
-        filt.set_parameter("resonance", 4.0)
+        filt.set_parameter("resonance", 2.5)
         
         audio_buffer = []
         duration = 3.0
