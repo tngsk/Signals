@@ -25,7 +25,9 @@ from .core.dsp_context import (
     get_context_sample_rate, has_context,
     generate_silence_explicit, write_wav_explicit
 )
-from .modules import Oscillator, EnvelopeADSR, Mixer, OutputWav, VCA
+from .modules import Oscillator, EnvelopeADSR, Mixer, OutputWav, VCA, Filter
+from .modules.oscillator import WaveformType
+from .modules.filter import FilterType
 from .processing import SynthEngine, ModuleGraph, Patch, PatchTemplate
 
 # Maintain backward compatibility with old imports
@@ -60,10 +62,13 @@ __all__ = [
     
     # Modules
     "Oscillator",
+    "WaveformType",
     "EnvelopeADSR",
     "Mixer", 
     "OutputWav",
     "VCA",
+    "Filter",
+    "FilterType",
     
     # Processing engines
     "SynthEngine",

@@ -6,6 +6,7 @@ oscillators, envelopes, VCA, mixer, and output modules with various
 parameter combinations and edge cases.
 """
 
+import math
 import pytest
 import numpy as np
 from signals import Oscillator, EnvelopeADSR, Mixer, VCA, OutputWav, Signal, SignalType
@@ -696,3 +697,238 @@ class TestModuleChaining:
         first_half_max = max(abs(x) for x in results[:100])
         second_half_max = max(abs(x) for x in results[100:])
         assert first_half_max >= second_half_max
+
+
+class TestFilter:
+    """Test cases for Filter module functionality."""
+
+    def test_filter_initialization(self):
+        """Test Filter module initialization with default parameters."""
+        from signals.modules.filter import Filter, FilterType
+        
+        filt = Filter(sample_rate=48000)
+        assert filt.sample_rate == 48000
+        assert filt.filter_type == FilterType.LOWPASS
+        assert filt.cutoff_frequency == 1000.0
+        assert filt.resonance == 0.707
+        assert filt.input_count == 1
+        assert filt.output_count == 1
+
+    def test_filter_types(self):
+        """Test different filter types."""
+        from signals.modules.filter import Filter, FilterType
+        from signals.core.module import Signal, SignalType
+        
+        filt = Filter(sample_rate=48000)
+        test_signal = Signal(SignalType.AUDIO, 0.5)
+        
+        # Test each filter type
+        for filter_type in FilterType:
+            filt.set_parameter("filter_type", filter_type.value)
+            assert filt.filter_type == filter_type
+            
+            # Should process without error
+            result = filt.process([test_signal])
+            assert len(result) == 1
+            assert result[0].type == SignalType.AUDIO
+            assert isinstance(result[0].value, (int, float))
+
+    def test_cutoff_frequency_parameter(self):
+        """Test cutoff frequency parameter changes."""
+        from signals.modules.filter import Filter
+        from signals.core.module import Signal, SignalType
+        
+        filt = Filter(sample_rate=48000)
+        
+        # Test frequency changes
+        filt.set_parameter("cutoff_frequency", 2000.0)
+        assert filt.cutoff_frequency == 2000.0
+        
+        filt.set_parameter("cutoff_frequency", 500.0)
+        assert filt.cutoff_frequency == 500.0
+        
+        # Test frequency clamping (should clamp to Nyquist)
+        filt.set_parameter("cutoff_frequency", 50000.0)
+        assert filt.cutoff_frequency == 24000.0  # Half of sample rate
+        
+        # Test minimum frequency clamping
+        filt.set_parameter("cutoff_frequency", 1.0)
+        assert filt.cutoff_frequency == 10.0  # Minimum allowed
+
+    def test_resonance_parameter(self):
+        """Test resonance/Q factor parameter changes."""
+        from signals.modules.filter import Filter
+        
+        filt = Filter(sample_rate=48000)
+        
+        # Test Q changes
+        filt.set_parameter("resonance", 2.0)
+        assert filt.resonance == 2.0
+        
+        filt.set_parameter("resonance", 0.5)
+        assert filt.resonance == 0.5
+        
+        # Test Q clamping
+        filt.set_parameter("resonance", 50.0)
+        assert filt.resonance == 20.0  # Maximum allowed
+        
+        filt.set_parameter("resonance", 0.01)
+        assert filt.resonance == 0.1  # Minimum allowed
+
+    def test_filter_processing(self):
+        """Test basic filter processing functionality."""
+        from signals.modules.filter import Filter, FilterType
+        from signals.core.module import Signal, SignalType
+        
+        filt = Filter(sample_rate=48000, filter_type=FilterType.LOWPASS)
+        filt.set_parameter("cutoff_frequency", 1000.0)
+        
+        # Process some samples
+        results = []
+        for _ in range(10):
+            test_signal = Signal(SignalType.AUDIO, 0.5)
+            result = filt.process([test_signal])
+            results.append(result[0].value)
+        
+        assert len(results) == 10
+        assert all(isinstance(x, (int, float)) for x in results)
+
+    def test_filter_frequency_response(self):
+        """Test filter frequency response characteristics."""
+        from signals.modules.filter import Filter, FilterType
+        from signals.modules.oscillator import Oscillator, WaveformType
+        from signals.core.module import Signal, SignalType
+        import math
+        
+        # Test lowpass filter response
+        filt = Filter(sample_rate=48000, filter_type=FilterType.LOWPASS)
+        filt.set_parameter("cutoff_frequency", 1000.0)
+        filt.set_parameter("resonance", 0.707)
+        
+        osc = Oscillator(sample_rate=48000, waveform=WaveformType.SINE)
+        
+        # Test response at different frequencies
+        test_frequencies = [100.0, 1000.0, 5000.0]  # Below, at, and above cutoff
+        responses = []
+        
+        for freq in test_frequencies:
+            # Reset filter state
+            filt.reset()
+            osc.set_parameter("frequency", freq)
+            osc.phase = 0.0  # Reset oscillator phase
+            
+            # Process enough samples to reach steady state
+            for _ in range(100):  # Warm-up samples
+                osc_signal = osc.process()[0]
+                filt.process([osc_signal])
+            
+            # Measure response amplitude
+            amplitudes = []
+            for _ in range(48):  # One period at 1kHz
+                osc_signal = osc.process()[0]
+                filtered = filt.process([osc_signal])[0]
+                amplitudes.append(abs(filtered.value))
+            
+            responses.append(max(amplitudes))
+        
+        # For lowpass: response should decrease with frequency
+        assert responses[0] > 0  # Should pass low frequencies
+        assert responses[2] < responses[1]  # High frequency should be attenuated
+
+    def test_filter_signal_types(self):
+        """Test filter with different signal types."""
+        from signals.modules.filter import Filter
+        from signals.core.module import Signal, SignalType
+        
+        filt = Filter(sample_rate=48000)
+        
+        # Test with AUDIO signal
+        audio_signal = Signal(SignalType.AUDIO, 0.5)
+        result = filt.process([audio_signal])
+        assert result[0].type == SignalType.AUDIO
+        
+        # Test with CONTROL signal (should output silence)
+        control_signal = Signal(SignalType.CONTROL, 0.5)
+        result = filt.process([control_signal])
+        assert result[0].type == SignalType.AUDIO
+        assert result[0].value == 0.0
+
+    def test_filter_no_input(self):
+        """Test filter behavior with no input."""
+        from signals.modules.filter import Filter
+        from signals.core.module import SignalType
+        
+        filt = Filter(sample_rate=48000)
+        
+        # Test with no inputs
+        result = filt.process([])
+        assert len(result) == 1
+        assert result[0].type == SignalType.AUDIO
+        assert result[0].value == 0.0
+        
+        # Test with None inputs
+        result = filt.process(None)
+        assert len(result) == 1
+        assert result[0].type == SignalType.AUDIO
+        assert result[0].value == 0.0
+
+    def test_filter_reset(self):
+        """Test filter state reset functionality."""
+        from signals.modules.filter import Filter
+        from signals.core.module import Signal, SignalType
+        
+        filt = Filter(sample_rate=48000)
+        
+        # Process some samples to build up state
+        test_signal = Signal(SignalType.AUDIO, 1.0)
+        for _ in range(10):
+            filt.process([test_signal])
+        
+        # State should be non-zero
+        assert filt.x1 != 0.0 or filt.y1 != 0.0
+        
+        # Reset and verify state is cleared
+        filt.reset()
+        assert filt.x1 == 0.0
+        assert filt.x2 == 0.0
+        assert filt.y1 == 0.0
+        assert filt.y2 == 0.0
+
+    def test_filter_invalid_parameters(self):
+        """Test filter behavior with invalid parameters."""
+        from signals.modules.filter import Filter
+        
+        filt = Filter(sample_rate=48000)
+        
+        # Test invalid filter type
+        old_type = filt.filter_type
+        filt.set_parameter("filter_type", "invalid_type")
+        assert filt.filter_type == old_type  # Should remain unchanged
+        
+        # Test invalid parameter name
+        old_cutoff = filt.cutoff_frequency
+        filt.set_parameter("invalid_param", 1000.0)
+        assert filt.cutoff_frequency == old_cutoff  # Should remain unchanged
+
+    def test_filter_stability(self):
+        """Test filter stability with extreme input values."""
+        from signals.modules.filter import Filter, FilterType
+        from signals.core.module import Signal, SignalType
+        
+        filt = Filter(sample_rate=48000, filter_type=FilterType.LOWPASS)
+        filt.set_parameter("cutoff_frequency", 10000.0)
+        filt.set_parameter("resonance", 10.0)  # High resonance
+        
+        # Test with large input values
+        large_signal = Signal(SignalType.AUDIO, 100.0)
+        result = filt.process([large_signal])
+        assert isinstance(result[0].value, (int, float))
+        assert not math.isnan(result[0].value)
+        assert not math.isinf(result[0].value)
+        
+        # Test with negative values
+        negative_signal = Signal(SignalType.AUDIO, -100.0)
+        result = filt.process([negative_signal])
+        assert isinstance(result[0].value, (int, float))
+        assert not math.isnan(result[0].value)
+        assert not math.isinf(result[0].value)

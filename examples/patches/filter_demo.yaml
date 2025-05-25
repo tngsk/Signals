@@ -1,0 +1,67 @@
+name: "Filter Demo Patch"
+description: "Demonstrates filter module with envelope-controlled cutoff frequency"
+
+variables:
+  base_freq: 220.0
+  cutoff_base: 400.0
+  cutoff_range: 2000.0
+  filter_q: 3.0
+  env_attack: 0.2
+  env_decay: 0.3
+  env_sustain: 0.6
+  env_release: 1.0
+  note_duration: 2.5
+
+modules:
+  osc1:
+    type: oscillator
+    parameters:
+      waveform: saw
+      frequency: "{{ base_freq }}"
+      amplitude: 0.8
+
+  env1:
+    type: envelope_adsr
+    parameters:
+      attack: "{{ env_attack }}"
+      decay: "{{ env_decay }}"
+      sustain: "{{ env_sustain }}"
+      release: "{{ env_release }}"
+
+  filter1:
+    type: filter
+    parameters:
+      filter_type: lowpass
+      cutoff_frequency: "{{ cutoff_base }}"
+      resonance: "{{ filter_q }}"
+
+  vca1:
+    type: vca
+    parameters: {}
+
+  out1:
+    type: output_wav
+    parameters:
+      filename: filter_demo_patch.wav
+      sample_rate: 48000
+      bits_per_sample: 16
+
+connections:
+  - from: [osc1, 0]
+    to: [filter1, 0]
+  - from: [filter1, 0]
+    to: [vca1, 0]
+  - from: [env1, 0]
+    to: [vca1, 1]
+  - from: [vca1, 0]
+    to: [out1, 0]
+
+automation:
+  - target: [env1, trigger_on]
+    time: 0.0
+  - target: [env1, trigger_off]
+    time: "{{ note_duration }}"
+  - target: [filter1, cutoff_frequency]
+    modulation_source: [env1, 0]
+    base_value: "{{ cutoff_base }}"
+    modulation_amount: "{{ cutoff_range }}"

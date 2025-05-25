@@ -14,11 +14,13 @@ from .envelope import EnvelopeADSR
 from .mixer import Mixer
 from .output import OutputWav
 from .vca import VCA
+from .filter import Filter
 
 __all__ = [
     "Oscillator",
     "EnvelopeADSR", 
     "Mixer",
     "OutputWav",
-    "VCA"
+    "VCA",
+    "Filter"
 ]
