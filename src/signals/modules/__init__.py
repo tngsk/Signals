@@ -15,6 +15,7 @@ from .mixer import Mixer
 from .output import OutputWav
 from .vca import VCA
 from .filter import Filter
+from .lfo import LFO
 
 __all__ = [
     "Oscillator",
@@ -22,5 +23,6 @@ __all__ = [
     "Mixer",
     "OutputWav",
     "VCA",
-    "Filter"
+    "Filter",
+    "LFO"
 ]

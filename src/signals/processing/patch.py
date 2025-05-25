@@ -18,6 +18,8 @@ from ..modules.envelope import EnvelopeADSR
 from ..modules.mixer import Mixer
 from ..modules.output import OutputWav
 from ..modules.vca import VCA
+from ..modules.filter import Filter, FilterType
+from ..modules.lfo import LFO
 
 
 class PatchError(Exception):
@@ -160,10 +162,19 @@ class Patch:
     # Registry of available module types
     MODULE_REGISTRY = {
         'oscillator': Oscillator,
+        'Oscillator': Oscillator,
         'envelope_adsr': EnvelopeADSR,
+        'EnvelopeADSR': EnvelopeADSR,
         'mixer': Mixer,
+        'Mixer': Mixer,
         'output_wav': OutputWav,
+        'OutputWav': OutputWav,
         'vca': VCA,
+        'VCA': VCA,
+        'filter': Filter,
+        'Filter': Filter,
+        'lfo': LFO,
+        'LFO': LFO,
     }
     
     def __init__(self, name: str = "Untitled Patch", description: str = "",

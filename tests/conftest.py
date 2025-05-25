@@ -138,6 +138,18 @@ def mixer_module():
 
 
 @pytest.fixture
+def lfo_module():
+    """Create LFO module for testing."""
+    def _create(sample_rate=48000, **params):
+        from signals import LFO
+        lfo = LFO(sample_rate)
+        for param, value in params.items():
+            lfo.set_parameter(param, value)
+        return lfo
+    return _create
+
+
+@pytest.fixture
 def synth_engine():
     """Create synthesis engine for testing."""
     def _create(sample_rate=48000, buffer_size=1024):

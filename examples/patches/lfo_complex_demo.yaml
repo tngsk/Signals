@@ -1,0 +1,110 @@
+# Complex LFO Modulation Demonstration Patch
+# Shows multiple LFOs modulating different parameters simultaneously
+
+name: "Complex LFO Modulation Demo"
+description: "Demonstrates multiple LFOs modulating frequency, amplitude, and filter cutoff"
+sample_rate: 48000
+
+modules:
+  # Main audio oscillator
+  osc_main:
+    type: "Oscillator"
+    parameters:
+      waveform: "saw"
+      frequency: 220.0   # A3 note
+      amplitude: 0.8
+
+  # LFO for frequency modulation (vibrato)
+  lfo_vibrato:
+    type: "LFO"
+    parameters:
+      waveform: "sine"
+      frequency: 5.0     # 5 Hz vibrato
+      amplitude: 0.05    # 5% frequency deviation
+
+  # LFO for amplitude modulation (tremolo)
+  lfo_tremolo:
+    type: "LFO"
+    parameters:
+      waveform: "triangle"
+      frequency: 7.0     # 7 Hz tremolo
+      amplitude: 0.4     # 40% amplitude modulation
+
+  # LFO for filter modulation
+  lfo_filter:
+    type: "LFO"
+    parameters:
+      waveform: "saw"
+      frequency: 0.3     # Slow filter sweep
+      amplitude: 1.0     # Full sweep range
+
+  # Low-pass filter
+  filter_main:
+    type: "Filter"
+    parameters:
+      filter_type: "lowpass"
+      cutoff_frequency: 1000.0
+      resonance: 3.0
+
+  # VCA for tremolo effect
+  vca_tremolo:
+    type: "VCA"
+    parameters:
+      gain: 1.0
+
+  # Envelope for overall shaping
+  env_main:
+    type: "EnvelopeADSR"
+    parameters:
+      attack: 0.2
+      decay: 0.3
+      sustain: 0.7
+      release: 0.8
+
+  # Final VCA for envelope
+  vca_env:
+    type: "VCA"
+    parameters:
+      gain: 1.0
+
+  # Audio output
+  output:
+    type: "OutputWav"
+    parameters:
+      filename: "lfo_complex_demo.wav"
+
+connections:
+  # Main audio path: OSC -> FILTER -> VCA (tremolo) -> VCA (envelope) -> OUTPUT
+  - source: "osc_main:output:0"
+    target: "filter_main:input:0"
+  
+  - source: "filter_main:output:0"
+    target: "vca_tremolo:input:0"
+  
+  - source: "vca_tremolo:output:0"
+    target: "vca_env:input:0"
+  
+  - source: "vca_env:output:0"
+    target: "output:input:0"
+
+  # LFO modulation connections
+  - source: "lfo_tremolo:output:0"
+    target: "vca_tremolo:input:1"
+
+  - source: "env_main:output:0"
+    target: "vca_env:input:1"
+
+# Note: Frequency and filter modulation would require parameter mapping
+# which is not yet implemented in the patch system, so these are handled
+# programmatically in the demonstration scripts
+
+sequence:
+  - time: 0.0
+    action: "trigger_on"
+    target: "env_main"
+  
+  - time: 4.0
+    action: "trigger_off"
+    target: "env_main"
+
+duration: 6.0

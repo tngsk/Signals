@@ -9,7 +9,7 @@ parameter combinations and edge cases.
 import math
 import pytest
 import numpy as np
-from signals import Oscillator, EnvelopeADSR, Mixer, VCA, OutputWav, Signal, SignalType
+from signals import Oscillator, EnvelopeADSR, Mixer, VCA, OutputWav, LFO, Signal, SignalType, WaveformType
 
 
 @pytest.mark.unit
@@ -697,6 +697,201 @@ class TestModuleChaining:
         first_half_max = max(abs(x) for x in results[:100])
         second_half_max = max(abs(x) for x in results[100:])
         assert first_half_max >= second_half_max
+
+
+@pytest.mark.unit
+class TestLFO:
+    """Comprehensive tests for the LFO module."""
+    
+    def test_lfo_initialization(self, sample_rates):
+        """Test LFO initialization with different sample rates."""
+        for sample_rate in sample_rates:
+            lfo = LFO(sample_rate)
+            assert lfo.sample_rate == sample_rate
+            assert lfo.input_count == 1  # Optional trigger input
+            assert lfo.output_count == 1
+            assert lfo.frequency == 1.0
+            assert lfo.amplitude == 1.0
+            assert lfo.phase_offset == 0.0
+            assert lfo.phase == 0.0
+    
+    def test_lfo_waveforms(self, sample_rates, waveform_types):
+        """Test LFO with all waveform types."""
+        for sample_rate in sample_rates[:1]:  # Use one sample rate for efficiency
+            for waveform in waveform_types:
+                lfo = LFO(sample_rate, waveform=getattr(WaveformType, waveform.upper()))
+                lfo.set_parameter("frequency", 2.0)  # 2 Hz
+                
+                outputs = []
+                for _ in range(100):
+                    output = lfo.process()
+                    assert len(output) == 1
+                    assert output[0].type == SignalType.CONTROL
+                    assert isinstance(output[0].value, float)
+                    assert -1.0 <= output[0].value <= 1.0
+                    outputs.append(output[0].value)
+                
+                # Should have variation in output
+                assert len(set(np.round(outputs, 6))) > 2
+    
+    def test_lfo_frequency_parameter(self, lfo_module):
+        """Test LFO frequency parameter control."""
+        lfo = lfo_module()
+        
+        # Test frequency changes
+        lfo.set_parameter("frequency", 2.0)
+        assert lfo.frequency == 2.0
+        
+        lfo.set_parameter("frequency", 0.5)
+        assert lfo.frequency == 0.5
+        
+        # Test frequency limits
+        lfo.set_parameter("frequency", 0.001)  # Below minimum
+        assert lfo.frequency == 0.01  # Should be clamped
+        
+        lfo.set_parameter("frequency", 100.0)  # Above maximum
+        assert lfo.frequency == 50.0  # Should be clamped
+    
+    def test_lfo_amplitude_parameter(self, lfo_module):
+        """Test LFO amplitude parameter control."""
+        lfo = lfo_module()
+        
+        # Test amplitude changes
+        lfo.set_parameter("amplitude", 0.5)
+        assert lfo.amplitude == 0.5
+        
+        # Test amplitude scaling in output
+        lfo.set_parameter("frequency", 10.0)  # Fast for quick test
+        outputs = []
+        for _ in range(50):
+            output = lfo.process()[0]
+            outputs.append(abs(output.value))
+        
+        # Maximum output should be close to amplitude
+        assert max(outputs) <= lfo.amplitude + 0.1
+        
+        # Test amplitude limits
+        lfo.set_parameter("amplitude", -0.5)
+        assert lfo.amplitude == 0.0  # Should be clamped
+        
+        lfo.set_parameter("amplitude", 2.0)
+        assert lfo.amplitude == 1.0  # Should be clamped
+    
+    def test_lfo_phase_offset(self, lfo_module):
+        """Test LFO phase offset parameter."""
+        lfo1 = lfo_module()
+        lfo2 = lfo_module()
+        
+        lfo1.set_parameter("frequency", 5.0)
+        lfo2.set_parameter("frequency", 5.0)
+        lfo2.set_parameter("phase_offset", 90.0)  # 90 degree offset
+        
+        # Get initial outputs
+        out1 = lfo1.process()[0].value
+        out2 = lfo2.process()[0].value
+        
+        # They should be different due to phase offset
+        assert abs(out1 - out2) > 0.1
+        
+        # Test phase offset wrapping
+        lfo2.set_parameter("phase_offset", 450.0)  # Should become 90.0
+        assert lfo2.phase_offset == 90.0
+    
+    def test_lfo_waveform_parameter(self, lfo_module):
+        """Test LFO waveform parameter changes."""
+        lfo = lfo_module()
+        
+        # Test waveform change by enum
+        lfo.set_parameter("waveform", WaveformType.SQUARE)
+        assert lfo.waveform == WaveformType.SQUARE
+        
+        # Test waveform change by string
+        lfo.set_parameter("waveform", "triangle")
+        assert lfo.waveform == WaveformType.TRIANGLE
+    
+    def test_lfo_trigger_input(self, lfo_module):
+        """Test LFO trigger input for phase reset."""
+        lfo = lfo_module()
+        lfo.set_parameter("frequency", 2.0)
+        
+        # Let LFO run for a while
+        for _ in range(50):
+            lfo.process()
+        
+        initial_phase = lfo.phase
+        assert initial_phase > 0.0
+        
+        # Send trigger signal
+        trigger = Signal(SignalType.TRIGGER, 1.0)
+        lfo.process([trigger])
+        
+        # Phase should be reset
+        assert abs(lfo.phase) < 0.01
+    
+    def test_lfo_invalid_parameters(self, lfo_module):
+        """Test LFO handling of invalid parameters."""
+        lfo = lfo_module()
+        original_freq = lfo.frequency
+        
+        # Test invalid parameter name
+        lfo.set_parameter("invalid_param", 5.0)
+        assert lfo.frequency == original_freq
+        
+        # Test invalid waveform
+        original_waveform = lfo.waveform
+        lfo.set_parameter("waveform", "invalid")
+        assert lfo.waveform == original_waveform
+    
+    def test_lfo_reset(self, lfo_module):
+        """Test LFO reset functionality."""
+        lfo = lfo_module()
+        lfo.set_parameter("phase_offset", 45.0)
+        
+        # Let LFO run
+        for _ in range(50):
+            lfo.process()
+        
+        # Reset LFO
+        lfo.reset()
+        
+        # Phase should be reset to phase offset
+        expected_phase = 45.0 / 360.0
+        assert abs(lfo.phase - expected_phase) < 0.01
+    
+    def test_lfo_modulation_integration(self, lfo_module, oscillator_module, vca_module):
+        """Test LFO integration with other modules for modulation."""
+        osc = oscillator_module(frequency=440.0, amplitude=0.8)
+        lfo = lfo_module()
+        vca = vca_module()
+        
+        lfo.set_parameter("frequency", 4.0)  # 4 Hz tremolo
+        lfo.set_parameter("amplitude", 0.5)
+        
+        # Process tremolo effect
+        results = []
+        for _ in range(100):
+            audio_signal = osc.process()[0]
+            lfo_signal = lfo.process()[0]
+            
+            # Convert LFO to 0-1 range for VCA
+            control_value = (lfo_signal.value + 1.0) * 0.5
+            control_signal = Signal(SignalType.CONTROL, control_value)
+            
+            tremolo_signal = vca.process([audio_signal, control_signal])[0]
+            results.append(tremolo_signal.value)
+        
+        # Should see amplitude modulation
+        assert len(results) == 100
+        rms_values = []
+        for i in range(0, len(results), 10):
+            chunk = results[i:i+10]
+            rms = np.sqrt(np.mean([x**2 for x in chunk]))
+            rms_values.append(rms)
+        
+        # RMS should vary due to tremolo
+        assert len(rms_values) > 1
+        assert max(rms_values) > min(rms_values) * 1.1
+</edits>
 
 
 class TestFilter:

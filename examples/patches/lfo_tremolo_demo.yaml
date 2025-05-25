@@ -1,0 +1,80 @@
+# LFO Tremolo Effect Demonstration Patch
+# Shows how to use LFO for amplitude modulation (tremolo effect)
+
+name: "LFO Tremolo Demo"
+description: "Demonstrates LFO creating tremolo effect with sine wave oscillator"
+sample_rate: 48000
+
+modules:
+  # Main audio oscillator
+  osc_main:
+    type: "Oscillator"
+    parameters:
+      waveform: "sine"
+      frequency: 440.0  # A4 note
+      amplitude: 0.8
+
+  # LFO for tremolo modulation
+  lfo_tremolo:
+    type: "LFO"
+    parameters:
+      waveform: "sine"
+      frequency: 4.0     # 4 Hz tremolo rate
+      amplitude: 0.6     # Modulation depth
+
+  # VCA for applying amplitude modulation
+  vca_main:
+    type: "VCA"
+    parameters:
+      gain: 1.0
+
+  # Envelope for overall shaping
+  env_main:
+    type: "EnvelopeADSR"
+    parameters:
+      attack: 0.1
+      decay: 0.2
+      sustain: 0.8
+      release: 0.5
+
+  # Final VCA for envelope application
+  vca_env:
+    type: "VCA"
+    parameters:
+      gain: 1.0
+
+  # Audio output
+  output:
+    type: "OutputWav"
+    parameters:
+      filename: "lfo_tremolo_demo.wav"
+
+connections:
+  # Audio signal path: OSC -> VCA (tremolo) -> VCA (envelope) -> OUTPUT
+  - source: "osc_main:output:0"
+    target: "vca_main:input:0"
+  
+  - source: "vca_main:output:0"
+    target: "vca_env:input:0"
+  
+  - source: "vca_env:output:0"
+    target: "output:input:0"
+
+  # LFO modulation: LFO -> VCA control
+  - source: "lfo_tremolo:output:0"
+    target: "vca_main:input:1"
+
+  # Envelope control: ENV -> VCA control
+  - source: "env_main:output:0"
+    target: "vca_env:input:1"
+
+sequence:
+  - time: 0.0
+    action: "trigger_on"
+    target: "env_main"
+  
+  - time: 2.0
+    action: "trigger_off"
+    target: "env_main"
+
+duration: 3.0
