@@ -7,7 +7,11 @@ various synthesizer components including oscillators, envelopes, and output modu
 
 import numpy as np
 import argparse
-from signals import Oscillator, EnvelopeADSR, Mixer, OutputWav, Signal, SignalType
+from signals import (
+    SynthEngine, synthesis_context,
+    Oscillator, EnvelopeADSR, Mixer, OutputWav, Signal, SignalType,
+    generate_silence, write_wav
+)
 from signals.modules.oscillator import WaveformType
 
 def main():
@@ -38,48 +42,67 @@ def main():
     duration = 2.0  # seconds
     num_samples = int(sample_rate * duration)
 
-    # Create modules
-    osc1 = Oscillator(sample_rate)
-    osc1.set_parameter("frequency", 440.0) # A4
-    osc1.set_parameter("waveform", "sine")
+    # Use context-based sample rate management
+    with synthesis_context(sample_rate=sample_rate):
+        # Create modules without explicit sample rate
+        osc1 = Oscillator()
+        osc1.set_parameter("frequency", 440.0) # A4
+        osc1.set_parameter("waveform", "sine")
 
-    adsr = EnvelopeADSR(sample_rate)
-    adsr.set_parameter("attack", 0.020)
-    adsr.set_parameter("decay", 0.8)
-    adsr.set_parameter("sustain", 0.0)
-    adsr.set_parameter("release", 0.1)
+        adsr = EnvelopeADSR()
+        adsr.set_parameter("attack", 0.020)
+        adsr.set_parameter("decay", 0.8)
+        adsr.set_parameter("sustain", 0.0)
+        adsr.set_parameter("release", 0.1)
 
-    # For Phase 1, we'll manually manage the output module's buffer
-    # In later phases, a proper graph processor would handle this.
-    output_wav = OutputWav("output_phase1.wav", sample_rate)
+        # For Phase 1, we'll manually manage the output module's buffer
+        # In later phases, a proper graph processor would handle this.
+        output_wav = OutputWav("output_phase1.wav", sample_rate)
 
-    # Simulate processing loop
-    # Trigger envelope at the beginning and release before the end
-    note_on_time = 0.0 # seconds
-    note_off_time = 1.5 # seconds
+        # Simulate processing loop
+        # Trigger envelope at the beginning and release before the end
+        note_on_time = 0.0 # seconds
+        note_off_time = 1.5 # seconds
 
-    for i in range(num_samples):
-        time_s = i / sample_rate
+        for i in range(num_samples):
+            time_s = i / sample_rate
 
-        # Envelope trigger logic
-        if abs(time_s - note_on_time) < (1.0 / sample_rate):
-             adsr.trigger_on()
-        if abs(time_s - note_off_time) < (1.0 / sample_rate):
-             adsr.trigger_off()
+            # Envelope trigger logic
+            if abs(time_s - note_on_time) < (1.0 / sample_rate):
+                 adsr.trigger_on()
+            if abs(time_s - note_off_time) < (1.0 / sample_rate):
+                 adsr.trigger_off()
 
-        osc_signal = osc1.process()[0]
-        env_signal = adsr.process()[0] # Pass trigger if implementing trigger input
+            osc_signal = osc1.process()[0]
+            env_signal = adsr.process()[0] # Pass trigger if implementing trigger input
 
-        modulated_signal_value = osc_signal.value * env_signal.value
-        output_wav.process([Signal(SignalType.AUDIO, modulated_signal_value)])
+            modulated_signal_value = osc_signal.value * env_signal.value
+            output_wav.process([Signal(SignalType.AUDIO, modulated_signal_value)])
 
-    # Add silence at the start if requested
-    if args.silence > 0:
-        output_wav.add_silence_at_start(args.silence)
-        print(f"Added {args.silence} seconds of silence at the start")
-
-    output_wav.finalize()
-    print(f"Phase 1 test complete. Check output_phase1.wav")
+        output_wav.finalize()
+        
+        # Add silence at the start if requested using context-aware DSP
+        if args.silence > 0:
+            # Read the generated audio file
+            import wave
+            with wave.open("output_phase1.wav", "rb") as wf:
+                frames = wf.readframes(wf.getnframes())
+                params = wf.getparams()
+            
+            # Convert frames back to numpy array
+            audio_data = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32767.0
+            
+            # Generate silence using context-aware function
+            silence = generate_silence(args.silence)
+            
+            # Combine silence + audio
+            combined_audio = np.concatenate([silence, audio_data])
+            
+            # Write back using context-aware function
+            write_wav("output_phase1.wav", combined_audio)
+            print(f"Added {args.silence} seconds of silence at the start using context-aware DSP")
+        
+        print(f"Phase 1 test complete. Check output_phase1.wav")
 
 if __name__ == "__main__":
     main()

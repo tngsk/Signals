@@ -10,6 +10,7 @@ Signals provides a comprehensive toolkit for building digital audio synthesizers
 
 ### Core Capabilities
 - **Modular Architecture**: Pluggable modules for oscillators, envelopes, mixers, and effects
+- **Context-Based Management**: Automatic sample rate consistency across synthesis graph
 - **Signal Processing**: High-performance audio processing with 32-bit float precision
 - **Patch System**: YAML-based configuration for complex synthesizer setups
 - **Template Engine**: Parameterized patches with Jinja2 templating
@@ -44,50 +45,95 @@ uv sync
 pip install -e .
 ```
 
+### Context-Based Sample Rate Management
+
+Signals now supports automatic sample rate management through context managers, eliminating the need to specify sample rates for every module:
+
+```python
+from signals import synthesis_context, SynthEngine, Oscillator, EnvelopeADSR, VCA
+
+# Method 1: Using synthesis_context function
+with synthesis_context(sample_rate=48000):
+    osc = Oscillator()        # Automatically uses 48kHz
+    env = EnvelopeADSR()      # Automatically uses 48kHz
+    vca = VCA()               # Automatically uses 48kHz
+
+# Method 2: Using SynthEngine as context manager
+with SynthEngine(sample_rate=44100) as engine:
+    osc = Oscillator()        # Automatically uses 44.1kHz
+    env = EnvelopeADSR()      # Automatically uses 44.1kHz
+
+# Method 3: Traditional explicit approach (still supported)
+osc = Oscillator(sample_rate=48000)
+env = EnvelopeADSR(sample_rate=48000)
+```
+
+**Benefits:**
+- 🎯 **Simplified Code**: No need to pass sample rate to every module
+- 🔒 **Guaranteed Consistency**: All modules automatically use the same sample rate
+- 🔄 **Easy Quality Switching**: Change sample rate in one place
+- 🔙 **Backward Compatible**: Explicit sample rates still work
+- 🏗️ **Clean Factories**: Create module sets without repetitive parameters
+
+**Different Quality Levels:**
+```python
+# High-quality synthesis (96kHz)
+with synthesis_context(sample_rate=96000):
+    hq_synth = create_melodic_synth()
+
+# Standard quality (48kHz)
+with synthesis_context(sample_rate=48000):
+    std_synth = create_drum_synth()
+
+# Demo quality (22.05kHz)
+with synthesis_context(sample_rate=22050):
+    demo_synth = create_bass_synth()
+```
+
 ### Basic Usage
 
 ```python
-from signals import SynthEngine
+from signals import SynthEngine, write_wav
 
-# Create synthesis engine
-engine = SynthEngine(sample_rate=48000)
-
-# Load a patch configuration
-patch = engine.load_patch("examples/patches/basic_synth.yaml")
-
-# Render audio
-audio = engine.render(duration=2.0)
-
-# Save to file
-from signals import write_wav
-write_wav("output.wav", audio, sample_rate=48000)
+# Create and use synthesis engine as context manager
+with SynthEngine(sample_rate=48000) as engine:
+    # Load a patch configuration
+    patch = engine.load_patch("examples/patches/basic_synth.yaml")
+    
+    # Render audio
+    audio = engine.render(duration=2.0)
+    
+    # Save to file
+    write_wav("output.wav", audio, sample_rate=48000)
 ```
 
 ### Programmatic Synthesis
 
 ```python
-from signals import Oscillator, EnvelopeADSR, VCA, Mixer
+from signals import synthesis_context, Oscillator, EnvelopeADSR, VCA, Mixer
 
-# Create modules
-osc = Oscillator(sample_rate=48000)
-osc.set_parameter("frequency", 440.0)
-osc.set_parameter("waveform", "sine")
+# Use context-based sample rate management
+with synthesis_context(sample_rate=48000):
+    # Create modules without explicit sample rate
+    osc = Oscillator()
+    osc.set_parameter("frequency", 440.0)
+    osc.set_parameter("waveform", "sine")
 
-env = EnvelopeADSR(sample_rate=48000)
-env.set_parameter("attack", 0.1)
-env.set_parameter("decay", 0.2)
-env.set_parameter("sustain", 0.7)
-env.set_parameter("release", 0.5)
+    env = EnvelopeADSR()
+    env.set_parameter("attack", 0.1)
+    env.set_parameter("decay", 0.2)
+    env.set_parameter("sustain", 0.7)
+    env.set_parameter("release", 0.5)
 
-vca = VCA(sample_rate=48000)
+    vca = VCA()
 
-# Process audio
-env.trigger_on()
-for _ in range(1000):
-    osc_signal = osc.process()[0]
-    env_signal = env.process()[0]
-    output = vca.process([osc_signal, env_signal])[0]
-    print(output.value)
+    # Process audio
+    env.trigger_on()
+    for _ in range(1000):
+        osc_signal = osc.process()[0]
+        env_signal = env.process()[0]
+        output = vca.process([osc_signal, env_signal])[0]
+        print(output.value)
 ```
 
 ## Project Structure
@@ -113,6 +159,9 @@ Signals/
 ### Interactive Demos
 
 ```bash
+# Context-based sample rate management demo
+uv run python scripts/demo_context_usage.py
+
 # Guided interactive demo
 uv run python scripts/demo_phase2_guided.py
 
@@ -136,51 +185,19 @@ uv run python render_patch.py examples/patches/basic_synth.yaml
 uv run python render_patch.py examples/patches/basic_synth.yaml --output my_audio.wav
 ```
 
-## Testing
-
-### Run All Tests
-
-```bash
-# Complete test suite
-uv run pytest
-
-# With coverage report
-uv run pytest --cov=src/signals --cov-report=html
-```
-
-### Category-Specific Testing
-
-```bash
-# Unit tests only
-uv run pytest tests/ -m unit
-
-# Integration tests
-uv run pytest tests/ -m integration
-
-# Performance tests
-uv run pytest tests/ -m performance
-
-# Skip slow tests
-uv run pytest tests/ -m "not slow"
-```
-
-### Performance and Debugging
-
-```bash
-# Module performance benchmarks
-uv run pytest tests/test_performance.py::TestModulePerformance -v
-
-# Complex patch regression tests
-uv run pytest tests/test_performance.py::TestComplexPatchRegression -v
-
-# Memory leak detection
-uv run pytest tests/test_debugging.py::TestMemoryProfiling -v
-
-# Detailed profiling analysis
-uv run pytest tests/test_debugging.py::TestGraphProfiling -v
-```
-
 ## Patch Configuration
+
+Patches can be loaded and rendered using context-based sample rate management:
+
+```python
+from signals import SynthEngine
+
+# Engine manages sample rate context automatically
+with SynthEngine(sample_rate=48000) as engine:
+    # All modules in the patch use the engine's sample rate
+    patch = engine.load_patch("examples/patches/basic_synth.yaml")
+    audio = engine.render(duration=2.0)
+```
 
 ### Basic Patch Format
 
@@ -224,6 +241,8 @@ sequence:
     target: "env1"
 ```
 
+**Note**: With context-based management, patches automatically inherit the engine's sample rate, ensuring all modules are consistent without manual configuration.
+
 ### Template System
 
 ```yaml
@@ -264,39 +283,16 @@ modules:
 - **Channels**: Mono, stereo (expandable)
 - **Buffer Sizes**: 64-4096 samples
 
-## Development
-
-### Adding New Modules
-
-1. Create module class inheriting from `Module`
-2. Implement required methods (`process`, parameter handling)
-3. Add comprehensive tests
-4. Update documentation and examples
-
-### Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit pull request
-
-### Code Quality
-
-- **Type Hints**: Full type annotation coverage
-- **Testing**: >90% code coverage target
-- **Performance**: Automated performance regression testing
-- **Documentation**: Comprehensive API documentation
-
 ## Architecture
 
 ### Design Principles
 
 1. **Modularity**: Independent, composable audio processing units
-2. **Performance**: Optimized for real-time audio processing
-3. **Flexibility**: Support for both programmatic and declarative usage
-4. **Quality**: Comprehensive testing and continuous integration
-5. **Maintainability**: Clean code with professional development practices
+2. **Context-Aware**: Automatic sample rate consistency without explicit configuration
+3. **Performance**: Optimized for real-time audio processing
+4. **Flexibility**: Support for both programmatic and declarative usage
+5. **Quality**: Comprehensive testing and continuous integration
+6. **Maintainability**: Clean code with professional development practices
 
 ### Signal Flow
 
@@ -322,10 +318,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Inspired by modular synthesizer design principles
 - Built with modern Python development practices
 - Comprehensive testing inspired by professional audio software development
-
-## Support
-
-- **Documentation**: See `.note/PROJECT_STRUCTURE.md` for detailed architecture
-- **Examples**: Check `examples/` directory for sample configurations
-- **Migration Guide**: See `MIGRATION_SUMMARY.md` for recent changes
-- **Test Documentation**: See `tests/README.md` for testing guidelines
