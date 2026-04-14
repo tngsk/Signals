@@ -115,18 +115,13 @@ class LFO(Module):
         elif name == "waveform":
             try:
                 old_waveform = self.waveform
-                if isinstance(value, WaveformType):
-                    self.waveform = value
+                # Use WaveformType(value) for both enum members and string values
+                # WaveformType values are lowercase, so convert string to lowercase
+                if isinstance(value, str):
+                    self.waveform = WaveformType(value.lower())
                 else:
-                    # WaveformType values are lowercase, so convert string to lowercase
-                    str_value = str(value).lower()
-                    # Find the enum member by value
-                    for wf in WaveformType:
-                        if wf.value == str_value:
-                            self.waveform = wf
-                            break
-                    else:
-                        raise ValueError(f"Unknown waveform: {value}")
+                    self.waveform = WaveformType(value)
+
                 self.logger.debug(f"LFO waveform changed: {old_waveform.value} -> {self.waveform.value}")
             except ValueError:
                 self.logger.warning(f"Unknown waveform type {value} for LFO")
