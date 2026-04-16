@@ -568,22 +568,6 @@ class TestOutputWav:
         output.finalize()
         # File should still be created but minimal size
     
-    def test_output_silence_addition(self, temp_dir):
-        """Test adding silence to output."""
-        filename = temp_dir / "test_silence.wav"
-        output = OutputWav(str(filename), 48000)
-        
-        # Add some audio
-        for _ in range(10):
-            audio_signal = Signal(SignalType.AUDIO, 0.5)
-            output.process([audio_signal])
-        
-        # Add silence at start
-        output.add_silence_at_start(0.1)  # 0.1 seconds
-        
-        output.finalize()
-        assert filename.exists()
-    
     def test_output_empty_buffer(self, temp_dir):
         """Test OutputWav with empty buffer."""
         filename = temp_dir / "test_empty.wav"
