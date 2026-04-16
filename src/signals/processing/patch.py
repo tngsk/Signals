@@ -8,6 +8,7 @@ instantiation from patch definitions.
 
 import yaml
 from jinja2 import Template, Environment, meta
+from jinja2.sandbox import SandboxedEnvironment
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 import re
@@ -105,7 +106,7 @@ class PatchTemplate:
     
     def _extract_variables(self) -> List[str]:
         """Extract variable names from Jinja2 template."""
-        env = Environment()
+        env = SandboxedEnvironment()
         try:
             ast = env.parse(self.template_content)
             return list(meta.find_undeclared_variables(ast))
@@ -121,7 +122,9 @@ class PatchTemplate:
         """
         # Try to parse a basic version to extract variables section
         try:
-            basic_content = Template(self.template_content).render()
+            env = SandboxedEnvironment()
+            template = env.from_string(self.template_content)
+            basic_content = template.render()
             basic_patch = yaml.safe_load(basic_content)
             return basic_patch.get('variables', {})
         except:
@@ -141,7 +144,8 @@ class PatchTemplate:
         variables = variables or {}
         
         try:
-            template = Template(self.template_content)
+            env = SandboxedEnvironment()
+            template = env.from_string(self.template_content)
             rendered_content = template.render(**variables)
             patch_data = yaml.safe_load(rendered_content)
             return Patch.from_dict(patch_data, source_file=self.template_file)

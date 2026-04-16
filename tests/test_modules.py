@@ -891,7 +891,7 @@ class TestLFO:
         # RMS should vary due to tremolo
         assert len(rms_values) > 1
         assert max(rms_values) > min(rms_values) * 1.1
-</edits>
+
 
 
 class TestFilter:

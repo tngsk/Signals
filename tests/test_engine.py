@@ -401,9 +401,8 @@ class TestPatchTemplate:
         template_file = temp_dir / "invalid.yaml"
         template_file.write_text(invalid_template)
         
-        template = PatchTemplate(template_file)
-        
-        with pytest.raises(PatchTemplateError, match="Template rendering error"):
+        with pytest.raises(PatchTemplateError, match="Error parsing template"):
+            template = PatchTemplate(template_file)
             template.instantiate({})
 
 
