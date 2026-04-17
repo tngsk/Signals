@@ -606,8 +606,10 @@ parameter_sets = [
     {"osc_freq": 880.0, "env_attack": 0.1}
 ]
 
-# This would generate multiple variations
-# results = engine.batch_render(template_file, parameter_sets, output_dir)
+# Loop through and generate variations
+# for params in parameter_sets:
+#     patch = engine.load_patch(template_file, params)
+#     engine.render(output_file=...)
         """)
         
         self.wait_for_enter()
