@@ -8,6 +8,7 @@ integration scenarios.
 
 import pytest
 import tempfile
+import contextlib
 import shutil
 import numpy as np
 from pathlib import Path
@@ -149,9 +150,11 @@ def lfo_module():
     return _create
 
 
+
 @pytest.fixture
 def synth_engine():
     """Create synthesis engine for testing."""
+    @contextlib.contextmanager
     def _create(sample_rate=48000, buffer_size=1024):
         engine = SynthEngine(sample_rate, buffer_size)
         yield engine

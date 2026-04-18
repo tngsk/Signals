@@ -198,21 +198,7 @@ class SynthEngine:
         try:
             # Determine duration
             if duration is None:
-                sequence_duration = self.current_patch.get_duration()
-                if sequence_duration == 0.0:
-                    sequence_duration = 2.0  # Default duration
-            
-                # Calculate additional time needed for envelope release phases
-                max_release_time = 0.0
-                for module_id, module_data in self.current_patch.modules.items():
-                    if module_data['type'] == 'envelope_adsr':
-                        envelope_module = self.current_graph.get_module(module_id)
-                        if envelope_module and hasattr(envelope_module, 'release_time'):
-                            max_release_time = max(max_release_time, envelope_module.release_time)
-            
-                # Total duration includes sequence time plus envelope release completion
-                duration = sequence_duration + max_release_time
-                self.logger.info(f"Auto-calculated duration: {duration:.3f}s (sequence: {sequence_duration:.3f}s + release: {max_release_time:.3f}s)")
+                duration = self._calculate_duration()
             else:
                 self.logger.info(f"Using specified duration: {duration:.3f}s")
             
@@ -239,6 +225,24 @@ class SynthEngine:
             self.logger.error(f"Rendering failed: {e}")
             raise EngineError(f"Rendering failed: {e}")
     
+    def _calculate_duration(self) -> float:
+        """Calculate total duration including envelope release phases."""
+        sequence_duration = self.current_patch.get_duration()
+        if sequence_duration == 0.0:
+            sequence_duration = 2.0  # Default duration
+
+        # Calculate additional time needed for envelope release phases
+        max_release_time = 0.0
+        for module_id, module_data in self.current_patch.modules.items():
+            if module_data['type'] == 'envelope_adsr':
+                envelope_module = self.current_graph.get_module(module_id)
+                if envelope_module and hasattr(envelope_module, 'release_time'):
+                    max_release_time = max(max_release_time, envelope_module.release_time)
+
+        duration = sequence_duration + max_release_time
+        self.logger.info(f"Auto-calculated duration: {duration:.3f}s (sequence: {sequence_duration:.3f}s + release: {max_release_time:.3f}s)")
+        return duration
+
     def _extract_audio_output(self, all_outputs: Dict[str, List[List[Signal]]], 
                              duration: float) -> np.ndarray:
         """Extract audio data from module outputs."""
