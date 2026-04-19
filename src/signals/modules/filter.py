@@ -8,11 +8,10 @@ for high-quality audio processing with configurable cutoff frequency and resonan
 
 import math
 from enum import Enum
-from typing import Optional
 
-from ..core.module import Module, ParameterType, Signal, SignalType
 from ..core.context import get_sample_rate_or_default
-from ..core.logging import get_logger, performance_logger, log_module_state
+from ..core.logging import get_logger, performance_logger
+from ..core.module import Module, ParameterType, Signal, SignalType
 
 
 class FilterType(Enum):
@@ -67,7 +66,7 @@ class Filter(Module):
         >>> filtered_signal = filt.process([audio_signal])[0]
     """
 
-    def __init__(self, sample_rate: Optional[int] = None, filter_type: FilterType = FilterType.LOWPASS):
+    def __init__(self, sample_rate: int | None = None, filter_type: FilterType = FilterType.LOWPASS):
         super().__init__(input_count=1, output_count=1)  # Audio input
         self.sample_rate = get_sample_rate_or_default(sample_rate)
         self.filter_type = filter_type
@@ -91,7 +90,7 @@ class Filter(Module):
         self._target_cutoff: float = self.cutoff_frequency
         self._target_resonance: float = self.resonance
         self._smooth_factor: float = 0.995  # Smoothing coefficient
-        
+
         # DC blocking filter
         self._dc_block_x1: float = 0.0
         self._dc_block_y1: float = 0.0
@@ -160,46 +159,7 @@ class Filter(Module):
         resonance = max(self.resonance, 1e-5)
         alpha = sin_omega / (2.0 * resonance)
 
-        if self.filter_type == FilterType.LOWPASS:
-            # Low-pass filter coefficients
-            b0 = (1.0 - cos_omega) / 2.0
-            b1 = 1.0 - cos_omega
-            b2 = (1.0 - cos_omega) / 2.0
-            a0 = 1.0 + alpha
-            a1 = -2.0 * cos_omega
-            a2 = 1.0 - alpha
-
-        elif self.filter_type == FilterType.HIGHPASS:
-            # High-pass filter coefficients
-            b0 = (1.0 + cos_omega) / 2.0
-            b1 = -(1.0 + cos_omega)
-            b2 = (1.0 + cos_omega) / 2.0
-            a0 = 1.0 + alpha
-            a1 = -2.0 * cos_omega
-            a2 = 1.0 - alpha
-
-        elif self.filter_type == FilterType.BANDPASS:
-            # Band-pass filter coefficients (constant skirt gain)
-            b0 = alpha
-            b1 = 0.0
-            b2 = -alpha
-            a0 = 1.0 + alpha
-            a1 = -2.0 * cos_omega
-            a2 = 1.0 - alpha
-
-        elif self.filter_type == FilterType.NOTCH:
-            # Notch filter coefficients
-            b0 = 1.0
-            b1 = -2.0 * cos_omega
-            b2 = 1.0
-            a0 = 1.0 + alpha
-            a1 = -2.0 * cos_omega
-            a2 = 1.0 - alpha
-
-        else:
-            # Default to unity gain (no filtering)
-            b0, b1, b2 = 1.0, 0.0, 0.0
-            a0, a1, a2 = 1.0, 0.0, 0.0
+        b0, b1, b2, a0, a1, a2 = self._calculate_type_coefficients(cos_omega, alpha)
 
         # 5. a0の下限値設定とより安全な正規化
         a0 = max(abs(a0), 1e-10)
@@ -213,13 +173,63 @@ class Filter(Module):
             self.b2 = b2 / a0
             self.a1 = a1 / a0
             self.a2 = a2 / a0
-            
+
             # Simple sanity check for extreme values
             if (abs(self.a2) > 0.999 or abs(self.a1) > 1.999 or
                 any(math.isnan(x) or math.isinf(x) for x in [self.b0, self.b1, self.b2, self.a1, self.a2])):
                 # Reset to bypass if coefficients are extreme
                 self.b0, self.b1, self.b2 = 1.0, 0.0, 0.0
                 self.a1, self.a2 = 0.0, 0.0
+
+    def _calculate_type_coefficients(self, cos_omega: float, alpha: float) -> tuple[float, float, float, float, float, float]:
+        """Dispatch to specific coefficient calculations based on filter type."""
+        if self.filter_type == FilterType.LOWPASS:
+            return self._calc_lowpass_coeffs(cos_omega, alpha)
+        elif self.filter_type == FilterType.HIGHPASS:
+            return self._calc_highpass_coeffs(cos_omega, alpha)
+        elif self.filter_type == FilterType.BANDPASS:
+            return self._calc_bandpass_coeffs(cos_omega, alpha)
+        elif self.filter_type == FilterType.NOTCH:
+            return self._calc_notch_coeffs(cos_omega, alpha)
+        else:
+            # Default to unity gain (no filtering)
+            return 1.0, 0.0, 0.0, 1.0, 0.0, 0.0
+
+    def _calc_lowpass_coeffs(self, cos_omega: float, alpha: float) -> tuple[float, float, float, float, float, float]:
+        b0 = (1.0 - cos_omega) / 2.0
+        b1 = 1.0 - cos_omega
+        b2 = (1.0 - cos_omega) / 2.0
+        a0 = 1.0 + alpha
+        a1 = -2.0 * cos_omega
+        a2 = 1.0 - alpha
+        return b0, b1, b2, a0, a1, a2
+
+    def _calc_highpass_coeffs(self, cos_omega: float, alpha: float) -> tuple[float, float, float, float, float, float]:
+        b0 = (1.0 + cos_omega) / 2.0
+        b1 = -(1.0 + cos_omega)
+        b2 = (1.0 + cos_omega) / 2.0
+        a0 = 1.0 + alpha
+        a1 = -2.0 * cos_omega
+        a2 = 1.0 - alpha
+        return b0, b1, b2, a0, a1, a2
+
+    def _calc_bandpass_coeffs(self, cos_omega: float, alpha: float) -> tuple[float, float, float, float, float, float]:
+        b0 = alpha
+        b1 = 0.0
+        b2 = -alpha
+        a0 = 1.0 + alpha
+        a1 = -2.0 * cos_omega
+        a2 = 1.0 - alpha
+        return b0, b1, b2, a0, a1, a2
+
+    def _calc_notch_coeffs(self, cos_omega: float, alpha: float) -> tuple[float, float, float, float, float, float]:
+        b0 = 1.0
+        b1 = -2.0 * cos_omega
+        b2 = 1.0
+        a0 = 1.0 + alpha
+        a1 = -2.0 * cos_omega
+        a2 = 1.0 - alpha
+        return b0, b1, b2, a0, a1, a2
 
     @performance_logger
     def process(self, inputs: list[Signal] | None = None) -> list[Signal]:
@@ -242,7 +252,7 @@ class Filter(Module):
         """
         # Smooth parameter changes
         self._smooth_parameters()
-        
+
         output_value = 0.0
 
         if inputs and len(inputs) >= 1:
@@ -250,7 +260,7 @@ class Filter(Module):
 
             if audio_input.type == SignalType.AUDIO:
                 x0 = audio_input.value
-                
+
                 # Apply DC blocking to input
                 x0 = self._dc_block(x0)
 
@@ -281,7 +291,7 @@ class Filter(Module):
         # Only update coefficients if parameters have changed significantly
         cutoff_diff = abs(self.cutoff_frequency - self._target_cutoff)
         resonance_diff = abs(self.resonance - self._target_resonance)
-        
+
         # Use faster smoothing for larger changes to be more responsive
         if cutoff_diff > 100.0 or resonance_diff > 0.5:
             # Faster smoothing for large changes
@@ -292,33 +302,33 @@ class Filter(Module):
         else:
             # No need to update if changes are very small
             return
-            
-        self.cutoff_frequency = (self.cutoff_frequency * smooth_factor + 
+
+        self.cutoff_frequency = (self.cutoff_frequency * smooth_factor +
                                self._target_cutoff * (1.0 - smooth_factor))
-        self.resonance = (self.resonance * smooth_factor + 
+        self.resonance = (self.resonance * smooth_factor +
                         self._target_resonance * (1.0 - smooth_factor))
         self._update_coefficients()
-    
+
     def _add_denormal_protection(self, value: float) -> float:
         """Add denormal protection to prevent very small values that can cause performance issues."""
         if abs(value) < 1e-20:
             return 0.0
         return value
-    
+
     def _dc_block(self, input_value: float) -> float:
         """Simple DC blocking filter to remove DC offset."""
         output = input_value - self._dc_block_x1 + self._dc_block_factor * self._dc_block_y1
         self._dc_block_x1 = input_value
         self._dc_block_y1 = output
         return output
-    
 
-    
+
+
     def _soft_clip(self, value: float, threshold: float = 0.8) -> float:
         """Apply soft clipping for more musical saturation instead of hard clipping."""
         if abs(value) <= threshold:
             return value
-        
+
         sign = 1.0 if value >= 0 else -1.0
         excess = abs(value) - threshold
         compressed = threshold + excess / (1.0 + excess)
