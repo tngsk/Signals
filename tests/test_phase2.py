@@ -231,6 +231,25 @@ class TestModuleGraph:
         with pytest.raises(CyclicGraphError):
             ModuleGraph(patch)
     
+    def test_get_module(self):
+        """Test retrieving a module by ID."""
+        patch_data = {
+            'modules': {
+                'osc1': {'type': 'oscillator', 'parameters': {'frequency': 440.0}}
+            }
+        }
+        patch = Patch.from_dict(patch_data)
+        graph = ModuleGraph(patch)
+
+        # Valid module ID
+        module = graph.get_module('osc1')
+        assert module is not None
+        assert module.__class__.__name__ == 'Oscillator'
+
+        # Invalid module ID
+        invalid_module = graph.get_module('invalid_id')
+        assert invalid_module is None
+
     def test_sample_processing(self):
         """Test single sample processing through graph."""
         patch_data = {
