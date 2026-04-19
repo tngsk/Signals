@@ -268,9 +268,9 @@ class TestModuleGraph:
         assert -1.0 <= outputs['osc1'][0].value <= 1.0
 
     def test_get_graph_info(self):
-        """Test retrieving graph information metadata."""
+        """Test retrieving graph information."""
         patch_data = {
-            'sample_rate': 44100,
+            'sample_rate': 48000,
             'modules': {
                 'osc1': {'type': 'oscillator', 'parameters': {'frequency': 440.0}},
                 'env1': {'type': 'envelope_adsr', 'parameters': {'attack': 0.1}}
@@ -279,13 +279,13 @@ class TestModuleGraph:
                 {'from': 'osc1.0', 'to': 'env1.0'}
             ],
             'sequence': [
-                {'time': 0.0, 'action': 'trigger', 'target': 'env1'},
-                {'time': 1.0, 'action': 'release', 'target': 'env1'}
+                {'time': 0.0, 'action': 'trigger', 'target': 'env1'}
             ]
         }
 
         patch = Patch.from_dict(patch_data)
         graph = ModuleGraph(patch)
+
         info = graph.get_graph_info()
 
         assert info['module_count'] == 2
@@ -293,8 +293,8 @@ class TestModuleGraph:
         assert len(info['execution_order']) == 2
         assert 'osc1' in info['execution_order']
         assert 'env1' in info['execution_order']
-        assert info['sample_rate'] == 44100
-        assert info['sequence_events'] == 2
+        assert info['sample_rate'] == 48000
+        assert info['sequence_events'] == 1
 
 
 class TestSynthEngine:
