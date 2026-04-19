@@ -11,7 +11,6 @@ from jinja2 import Template, Environment, meta
 from jinja2.sandbox import SandboxedEnvironment
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
-import re
 
 from ..core.module import Module, Signal, SignalType
 from ..modules.oscillator import Oscillator, WaveformType

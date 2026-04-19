@@ -8,7 +8,7 @@ bit depths and includes functionality for adding silence to recordings.
 
 import numpy as np
 
-from ..core.dsp import generate_silence, write_wav
+from ..core.dsp import write_wav
 from ..core.module import Module, Signal, SignalType
 
 
@@ -34,7 +34,6 @@ class OutputWav(Module):
     Example:
         >>> output = OutputWav("recording.wav", sample_rate=48000, bits_per_sample=24)
         >>> output.process([audio_signal])  # Capture audio
-        >>> output.add_silence_at_start(0.5)  # Add 0.5s silence
         >>> output.finalize()  # Write to file
     """
 
@@ -67,39 +66,6 @@ class OutputWav(Module):
             # For now, assume single float values. Block processing later.
             self._buffer.append(inputs[0].value)
         return []
-
-    def add_silence_at_start(self, silence_duration: float):
-        """
-        Add silence of specified duration at the beginning of the audio buffer.
-
-        Prepends a period of silence (zero values) to the beginning of the captured
-        audio. This is useful for creating lead-in time or spacing between audio
-        segments. The silence is inserted before any existing audio data.
-
-        Args:
-            silence_duration: Duration of silence to add in seconds (must be >= 0.0)
-
-        Warning:
-            If the buffer is empty when this method is called, it will still add
-            silence, which may not be the intended behavior.
-
-        Example:
-            >>> output.add_silence_at_start(1.0)  # Add 1 second of silence
-        """
-        if not self._buffer:
-            print("Warning: Buffer is empty, adding silence to an empty buffer")
-
-        # Generate silence
-        silence = generate_silence(silence_duration, self.sample_rate)
-
-        # Convert current buffer to numpy array
-        current_buffer = np.array(self._buffer, dtype=np.float32)
-
-        # Concatenate silence with current buffer
-        new_buffer = np.concatenate((silence, current_buffer))
-
-        # Update buffer
-        self._buffer = new_buffer.tolist()
 
     def finalize(self):
         """
