@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Signals Node Editor</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #222; color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh;}
+
+        #toolbar {
+            background: #333;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            border-bottom: 1px solid #555;
+            z-index: 10;
+        }
+
+        button, select {
+            background: #444; color: white; border: 1px solid #666; padding: 5px 10px; border-radius: 4px; cursor: pointer;
+        }
+        button:hover { background: #555; }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .node {
+            position: absolute; width: 140px; background: #333; border: 1px solid #555;
+            border-radius: 5px; padding: 10px; cursor: move; user-select: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 5;
+        }
+
+        .node-header {
+            font-weight: bold;
+            border-bottom: 1px solid #555;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .port {
+            width: 12px; height: 12px; background: #888; border-radius: 50%;
+            position: absolute; cursor: crosshair;
+        }
+        .port:hover { background: #aaa; transform: scale(1.2); }
+        .port.in { left: -6px; transform: translateY(-50%); }
+        .port.out { right: -6px; transform: translateY(-50%); }
+
+        .param { width: 100%; box-sizing: border-box; background: #222; color: white; border: 1px solid #444; padding: 2px;}
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <select id="node-type">
+            <option value="oscillator">Oscillator</option>
+            <option value="envelope_adsr">Envelope (ADSR)</option>
+            <option value="vca">VCA</option>
+            <option value="output_wav">Output</option>
+        </select>
+        <button id="add-node-btn">Add Node</button>
+        <div style="flex-grow: 1;"></div>
+        <button id="play-btn" style="background: #27ae60; font-weight: bold;">Render & Play</button>
+        <audio id="audio-player" controls style="height: 30px;"></audio>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="node_editor.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const editor = new NodeEditor('canvas-container');
+
+            // Setup initial patch similar to basic_synth.yaml
+            const osc = editor.addNode('oscillator', { x: 50, y: 100, name: 'Oscillator' });
+            const env = editor.addNode('envelope_adsr', { x: 50, y: 250, name: 'ADSR Env' });
+            const vca = editor.addNode('vca', { x: 300, y: 150, name: 'VCA' });
+            const out = editor.addNode('output_wav', { x: 500, y: 150, name: 'Output' });
+
+            editor.addConnection(osc, '0', vca, '0');
+            editor.addConnection(env, '0', vca, '1');
+            editor.addConnection(vca, '0', out, '0');
+
+            // Toolbar interactions
+            document.getElementById('add-node-btn').addEventListener('click', () => {
+                const type = document.getElementById('node-type').value;
+                editor.addNode(type, { x: 100, y: 100, name: type });
+            });
+
+            document.getElementById('play-btn').addEventListener('click', async () => {
+                const btn = document.getElementById('play-btn');
+                btn.textContent = 'Rendering...';
+                btn.disabled = true;
+
+                try {
+                    const data = editor.getGraphData();
+                    console.log("Sending:", data);
+
+                    const response = await fetch('/render', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        const player = document.getElementById('audio-player');
+                        // Add cache buster to force reload
+                        player.src = result.audio_url + '?t=' + new Date().getTime();
+                        player.play();
+                    } else {
+                        alert('Render error: ' + result.message);
+                        console.error(result);
+                    }
+                } catch (err) {
+                    alert('Network error: ' + err.message);
+                } finally {
+                    btn.textContent = 'Render & Play';
+                    btn.disabled = false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
