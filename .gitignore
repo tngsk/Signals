@@ -200,3 +200,7 @@ perf_test.yaml
 
 # Reports and test outputs
 reports/
+
+# Node Editor temp files
+scripts/node_editor/temp_patch.yaml
+scripts/node_editor/output.wav
