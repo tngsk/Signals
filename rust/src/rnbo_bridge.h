@@ -7,24 +7,25 @@
 
 namespace rnbo_bridge {
 
-class RNBOObject {
+class RnboHost {
 public:
-    RNBOObject();
-    ~RNBOObject();
+    RnboHost(double sample_rate, size_t block_size);
+    ~RnboHost();
 
+    void prepare_to_process(double sample_rate, size_t block_size);
     void set_parameter(size_t index, double value);
     double get_parameter(size_t index) const;
 
-    void process(const rust::Slice<const double> input, rust::Slice<double> output);
     void process_block(const rust::Slice<const double> inputs, rust::Slice<double> outputs, size_t block_size);
 
     size_t get_num_inputs() const;
     size_t get_num_outputs() const;
 
 private:
-    std::unique_ptr<RNBO::PatcherInterface> rnbo_object;
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
-std::unique_ptr<RNBOObject> create_rnbo_object();
+std::unique_ptr<RnboHost> create_rnbo_host(double sample_rate, size_t block_size);
 
 } // namespace rnbo_bridge

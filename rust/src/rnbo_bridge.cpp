@@ -1,46 +1,111 @@
-#include "rnbo_bridge.h"
-#include "../../RNBO_Integration/analogosc.cpp.h"
+//
+// rnbo_bridge.cpp
+// Based on rnbo.example.baremetal (Cycling '74)
+// Prerequisites: RNBO Minimal Export, fixed block size processing
+//
 
-class StdOutLogger : public RNBO::Logger {
-public:
-    void log(RNBO::LogLevel level, const char* message) override {}
-};
+#define RNBO_NOTHROW
+#define RNBO_USECUSTOMPLATFORMPRINT
+#define RNBO_USECUSTOMALLOCATOR
+#define RNBO_FIXEDLISTSIZE 64
 
-static StdOutLogger stdOutLogger;
+#include "tlsf.h"
+#include <iostream>
+#include <memory>
+#include <vector>
+#include <cstring>
 
-namespace rnbo_bridge {
+tlsf_t myPool = nullptr;
+static int poolRefCount = 0;
+static void* memPoolBufferGlobal = nullptr;
 
-RNBOObject::RNBOObject() {
-    RNBO::SetLogger(&stdOutLogger);
-    rnbo_object.reset(RNBO::GetPatcherFactoryFunction()());
-    if (rnbo_object) {
-        rnbo_object->prepareToProcess(44100, 256);
+namespace RNBO {
+    namespace Platform {
+        void* malloc(size_t size) {
+            return tlsf_malloc(myPool, size);
+        }
+        void free(void* ptr) {
+            tlsf_free(myPool, ptr);
+        }
+        void* realloc(void* ptr, size_t size) {
+            return tlsf_realloc(myPool, ptr, size);
+        }
+        void* calloc(size_t count, size_t size) {
+            auto mem = malloc(count * size);
+            if (mem) {
+                memset(mem, 0, count * size);
+            }
+            return mem;
+        }
+
+        static void printMessage(const char* message) {
+            std::cout << message << std::endl;
+        }
+        static void printErrorMessage(const char* message) {
+            printMessage(message);
+        }
     }
 }
 
-RNBOObject::~RNBOObject() = default;
+#include "rnbo_bridge.h"
+#include "../../RNBO_Integration/analogosc.cpp.h"
 
-void RNBOObject::set_parameter(size_t index, double value) {
-    if (rnbo_object) rnbo_object->setParameterValue(index, value);
+// MyEngine - minimal engine derived from MinimalEngine
+class MyEngine : public RNBO::MinimalEngine<> {
+public:
+    MyEngine(RNBO::PatcherInterface* patcher)
+        : RNBO::MinimalEngine<>(patcher) {}
+};
+
+namespace rnbo_bridge {
+
+struct RnboHost::Impl {
+    std::unique_ptr<RNBO::rnbomatic<MyEngine>> rnbo;
+    Impl() : rnbo(nullptr) {}
+};
+
+RnboHost::RnboHost(double sample_rate, size_t block_size) : pImpl(std::make_unique<Impl>()) {
+    if (poolRefCount == 0) {
+        const size_t poolSize = 10 * 1024 * 1024; // 10 MB should be more than enough for rnbo core objects
+        memPoolBufferGlobal = ::malloc(poolSize);
+        myPool = tlsf_create_with_pool(memPoolBufferGlobal, poolSize);
+    }
+    poolRefCount++;
+
+    pImpl->rnbo = std::make_unique<RNBO::rnbomatic<MyEngine>>();
+    pImpl->rnbo->initialize();
+    pImpl->rnbo->prepareToProcess(sample_rate, block_size, true);
 }
 
-double RNBOObject::get_parameter(size_t index) const {
-    if (rnbo_object) return rnbo_object->getParameterValue(index);
+RnboHost::~RnboHost() {
+    pImpl->rnbo.reset();
+    poolRefCount--;
+    if (poolRefCount == 0 && myPool) {
+        tlsf_destroy(myPool);
+        ::free(memPoolBufferGlobal);
+        myPool = nullptr;
+        memPoolBufferGlobal = nullptr;
+    }
+}
+
+void RnboHost::prepare_to_process(double sample_rate, size_t block_size) {
+    if (pImpl->rnbo) pImpl->rnbo->prepareToProcess(sample_rate, block_size, true);
+}
+
+void RnboHost::set_parameter(size_t index, double value) {
+    if (pImpl->rnbo) pImpl->rnbo->setParameterValue(index, value, RNBO::TimeNow);
+}
+
+double RnboHost::get_parameter(size_t index) const {
+    if (pImpl->rnbo) return pImpl->rnbo->getParameterValue(index);
     return 0.0;
 }
 
-void RNBOObject::process(const rust::Slice<const double> input, rust::Slice<double> output) {
-    if (!rnbo_object) return;
-    const double* inputs[] = { input.data() };
-    double* outputs[] = { output.data() };
-    rnbo_object->process(inputs, 1, outputs, 1, input.size());
-}
+void RnboHost::process_block(const rust::Slice<const double> inputs, rust::Slice<double> outputs, size_t block_size) {
+    if (!pImpl->rnbo) return;
 
-void RNBOObject::process_block(const rust::Slice<const double> inputs, rust::Slice<double> outputs, size_t block_size) {
-    if (!rnbo_object) return;
-
-    size_t num_inputs = rnbo_object->getNumInputChannels();
-    size_t num_outputs = rnbo_object->getNumOutputChannels();
+    size_t num_inputs = pImpl->rnbo->getNumInputChannels();
+    size_t num_outputs = pImpl->rnbo->getNumOutputChannels();
 
     std::vector<const double*> in_ptrs(num_inputs, nullptr);
     std::vector<double*> out_ptrs(num_outputs, nullptr);
@@ -64,21 +129,21 @@ void RNBOObject::process_block(const rust::Slice<const double> inputs, rust::Sli
         }
     }
 
-    rnbo_object->process(in_ptrs.data(), num_inputs, out_ptrs.data(), num_outputs, block_size);
+    pImpl->rnbo->process(in_ptrs.data(), num_inputs, out_ptrs.data(), num_outputs, block_size);
 }
 
-size_t RNBOObject::get_num_inputs() const {
-    if (rnbo_object) return rnbo_object->getNumInputChannels();
+size_t RnboHost::get_num_inputs() const {
+    if (pImpl->rnbo) return pImpl->rnbo->getNumInputChannels();
     return 0;
 }
 
-size_t RNBOObject::get_num_outputs() const {
-    if (rnbo_object) return rnbo_object->getNumOutputChannels();
+size_t RnboHost::get_num_outputs() const {
+    if (pImpl->rnbo) return pImpl->rnbo->getNumOutputChannels();
     return 0;
 }
 
-std::unique_ptr<RNBOObject> create_rnbo_object() {
-    return std::make_unique<RNBOObject>();
+std::unique_ptr<RnboHost> create_rnbo_host(double sample_rate, size_t block_size) {
+    return std::make_unique<RnboHost>(sample_rate, block_size);
 }
 
 } // namespace rnbo_bridge
