@@ -1,0 +1,78 @@
+{
+  "parameters": [
+    {
+      "type": "ParameterTypeNumber",
+      "index": 0,
+      "name": "mode",
+      "paramId": "osc.analog/mode",
+      "minimum": 0,
+      "maximum": 5,
+      "exponent": 1,
+      "steps": 6,
+      "initialValue": 2,
+      "isEnum": true,
+      "enumValues": [
+        "noise",
+        "sine",
+        "saw",
+        "triangle",
+        "square",
+        "pulse"
+      ],
+      "displayName": "",
+      "unit": "",
+      "order": 0,
+      "displayorder": "-",
+      "debug": false,
+      "visible": true,
+      "signalIndex": null,
+      "ioType": "IOTypeUndefined"
+    }
+  ],
+  "numParameters": 1,
+  "numSignalInParameters": 0,
+  "numSignalOutParameters": 0,
+  "numInputChannels": 1,
+  "numOutputChannels": 2,
+  "numMidiInputPorts": 1,
+  "numMidiOutputPorts": 0,
+  "transportUsed": false,
+  "externalDataRefs": [],
+  "patcherSerial": 0,
+  "inports": [],
+  "outports": [],
+  "inlets": [
+    {
+      "type": "signal",
+      "index": 1,
+      "tag": "in1",
+      "meta": ""
+    },
+    {
+      "type": "midi"
+    }
+  ],
+  "outlets": [
+    {
+      "type": "signal",
+      "index": 1,
+      "tag": "out1",
+      "meta": ""
+    },
+    {
+      "type": "signal",
+      "index": 2,
+      "tag": "out2",
+      "meta": ""
+    }
+  ],
+  "presetid": "rnbo",
+  "meta": {
+    "architecture": "x64",
+    "filename": "RNBO_Test_Patch.maxpat",
+    "rnboobjname": "rnbomatic",
+    "maxversion": "9.1.4",
+    "rnboversion": "1.4.3",
+    "name": "analogosc"
+  }
+}
