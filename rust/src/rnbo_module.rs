@@ -5,29 +5,35 @@ pub mod ffi {
     unsafe extern "C++" {
         include!("signals_core/src/rnbo_bridge.h");
 
-        type RNBOObject;
+        type RnboHost;
 
-        fn create_rnbo_object() -> UniquePtr<RNBOObject>;
+        fn create_rnbo_host(sample_rate: f64, block_size: usize) -> UniquePtr<RnboHost>;
 
-        fn set_parameter(self: Pin<&mut RNBOObject>, index: usize, value: f64);
-        fn get_parameter(self: &RNBOObject, index: usize) -> f64;
+        fn prepare_to_process(self: Pin<&mut RnboHost>, sample_rate: f64, block_size: usize);
 
-        fn process_block(self: Pin<&mut RNBOObject>, inputs: &[f64], outputs: &mut [f64], block_size: usize);
+        fn set_parameter(self: Pin<&mut RnboHost>, index: usize, value: f64);
+        fn get_parameter(self: &RnboHost, index: usize) -> f64;
 
-        fn get_num_inputs(self: &RNBOObject) -> usize;
-        fn get_num_outputs(self: &RNBOObject) -> usize;
+        fn process_block(self: Pin<&mut RnboHost>, inputs: &[f64], outputs: &mut [f64], block_size: usize);
+
+        fn get_num_inputs(self: &RnboHost) -> usize;
+        fn get_num_outputs(self: &RnboHost) -> usize;
     }
 }
 
 pub struct RNBOModule {
-    inner: cxx::UniquePtr<ffi::RNBOObject>,
+    inner: cxx::UniquePtr<ffi::RnboHost>,
 }
 
 impl RNBOModule {
-    pub fn new() -> Self {
+    pub fn with_config(sample_rate: f64, block_size: usize) -> Self {
         Self {
-            inner: ffi::create_rnbo_object(),
+            inner: ffi::create_rnbo_host(sample_rate, block_size),
         }
+    }
+
+    pub fn prepare_to_process(&mut self, sample_rate: f64, block_size: usize) {
+        self.inner.pin_mut().prepare_to_process(sample_rate, block_size);
     }
 
     pub fn set_parameter(&mut self, index: usize, value: f64) {
