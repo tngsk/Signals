@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+recursive-include RNBO_Integration *
+recursive-include src/signals *.py *.cpp py.typed

@@ -16,6 +16,7 @@ dependencies = [
     "pytest-mock>=3.15.1",
     "psutil>=7.2.2",
     "playwright>=1.59.0",
+    "pybind11>=3.0.4",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -53,8 +54,8 @@ Repository = "https://github.com/tngsk/signals"
 Issues = "https://github.com/tngsk/signals/issues"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0.0", "pybind11>=3.0.4"]
+build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
