@@ -7,7 +7,7 @@ from setuptools import setup, Extension
 # By resolving the path absolutely to where setup.py runs, we can include it correctly.
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
-rnbo_inc = os.path.join(curr_dir, "RNBO_Integration")
+rnbo_inc = os.path.join(curr_dir, "..", "RNBO_Integration")
 rnbo_common_inc = os.path.join(rnbo_inc, "common")
 
 ext_modules = [
