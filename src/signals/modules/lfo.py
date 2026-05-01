@@ -8,12 +8,11 @@ specifically for parameter modulation rather than audio synthesis.
 """
 
 import math
-from typing import Optional
 
-from ..core.module import Module, ParameterType, Signal, SignalType
-from .oscillator import WaveformType
 from ..core.context import get_sample_rate_or_default
 from ..core.logging import get_logger, performance_logger
+from ..core.module import Module, ParameterType, Signal, SignalType
+from .oscillator import WaveformType
 
 
 class LFO(Module):
@@ -56,25 +55,25 @@ class LFO(Module):
         >>> modulated = vca.process([audio_in, control_signal])[0]
     """
 
-    def __init__(self, sample_rate: Optional[int] = None, waveform: WaveformType = WaveformType.SINE):
+    def __init__(self, sample_rate: int | None = None, waveform: WaveformType = WaveformType.SINE):
         super().__init__(input_count=1, output_count=1)  # Optional trigger input
         self.sample_rate = get_sample_rate_or_default(sample_rate)
         self.waveform = waveform
-        
+
         # LFO parameters
         self.frequency: float = 1.0  # 1 Hz default
         self.amplitude: float = 1.0  # Full amplitude
         self.phase_offset: float = 0.0  # No phase offset
-        
+
         # Internal state
         self.phase: float = 0.0  # Current phase (0.0 to 1.0)
         self.phase_increment: float = 0.0
-        
+
         self.logger = get_logger('modules.lfo')
-        
+
         # Calculate initial phase increment
         self._update_phase_increment()
-        
+
         self.logger.debug(f"LFO initialized: sample_rate={self.sample_rate}, "
                          f"waveform={waveform.value}, frequency={self.frequency:.2f}Hz")
 
@@ -100,18 +99,18 @@ class LFO(Module):
             self.frequency = max(0.01, min(float(value), 50.0))
             self._update_phase_increment()
             self.logger.debug(f"LFO frequency changed: {old_freq:.3f}Hz -> {self.frequency:.3f}Hz")
-            
+
         elif name == "amplitude":
             old_amp = self.amplitude
             self.amplitude = max(0.0, min(float(value), 1.0))
             self.logger.debug(f"LFO amplitude changed: {old_amp:.3f} -> {self.amplitude:.3f}")
-            
+
         elif name == "phase_offset":
             old_offset = self.phase_offset
             # Normalize to 0-360 range
             self.phase_offset = float(value) % 360.0
             self.logger.debug(f"LFO phase offset changed: {old_offset:.1f}° -> {self.phase_offset:.1f}°")
-            
+
         elif name == "waveform":
             try:
                 old_waveform = self.waveform
@@ -144,26 +143,26 @@ class LFO(Module):
         """
         if self.waveform == WaveformType.SINE:
             return math.sin(2.0 * math.pi * phase)
-            
+
         elif self.waveform == WaveformType.SQUARE:
             return 1.0 if phase < 0.5 else -1.0
-            
+
         elif self.waveform == WaveformType.SAW:
             return 2.0 * phase - 1.0
-            
+
         elif self.waveform == WaveformType.TRIANGLE:
             if phase < 0.5:
                 return 4.0 * phase - 1.0
             else:
                 return 3.0 - 4.0 * phase
-                
+
         elif self.waveform == WaveformType.NOISE:
             # Use simple pseudo-random based on phase for consistency
             # This ensures repeatable noise pattern at same frequency
             import random
             random.seed(int(phase * 1000000))
             return random.uniform(-1.0, 1.0)
-            
+
         else:
             return 0.0
 
@@ -196,16 +195,16 @@ class LFO(Module):
 
         # Apply phase offset
         current_phase = (self.phase + (self.phase_offset / 360.0)) % 1.0
-        
+
         # Generate waveform sample
         waveform_value = self._generate_waveform(current_phase)
-        
+
         # Apply amplitude scaling
         output_value = waveform_value * self.amplitude
-        
+
         # Advance phase
         self.phase = (self.phase + self.phase_increment) % 1.0
-        
+
         return [Signal(SignalType.CONTROL, output_value)]
 
     def reset(self):

@@ -43,6 +43,8 @@ test = [
 
 [project.scripts]
 signals = "signals.cli:main"
+signals-osc = "signals.cli:signals_osc"
+signals-filter = "signals.cli:signals_filter"
 
 [project.urls]
 Homepage = "https://github.com/tngsk/signals"

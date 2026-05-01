@@ -5,14 +5,21 @@ This module provides a command-line interface for generating audio signals using
 various synthesizer components including oscillators, envelopes, and output modules.
 """
 
-import numpy as np
 import argparse
+
+import numpy as np
+
 from signals import (
-    SynthEngine, synthesis_context,
-    Oscillator, EnvelopeADSR, Mixer, OutputWav, Signal, SignalType,
-    generate_silence, write_wav
+    EnvelopeADSR,
+    Oscillator,
+    OutputWav,
+    Signal,
+    SignalType,
+    generate_silence,
+    synthesis_context,
+    write_wav,
 )
-from signals.modules.oscillator import WaveformType
+
 
 def main():
     """
@@ -80,7 +87,7 @@ def main():
             output_wav.process([Signal(SignalType.AUDIO, modulated_signal_value)])
 
         output_wav.finalize()
-        
+
         # Add silence at the start if requested using context-aware DSP
         if args.silence > 0:
             # Read the generated audio file
@@ -88,21 +95,21 @@ def main():
             with wave.open("output_phase1.wav", "rb") as wf:
                 frames = wf.readframes(wf.getnframes())
                 params = wf.getparams()
-            
+
             # Convert frames back to numpy array
             audio_data = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32767.0
-            
+
             # Generate silence using context-aware function
             silence = generate_silence(args.silence)
-            
+
             # Combine silence + audio
             combined_audio = np.concatenate([silence, audio_data])
-            
+
             # Write back using context-aware function
             write_wav("output_phase1.wav", combined_audio)
             print(f"Added {args.silence} seconds of silence at the start using context-aware DSP")
-        
-        print(f"Phase 1 test complete. Check output_phase1.wav")
+
+        print("Phase 1 test complete. Check output_phase1.wav")
 
 if __name__ == "__main__":
     main()

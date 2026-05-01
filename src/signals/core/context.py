@@ -7,8 +7,8 @@ sample rate specification while maintaining consistency across the synthesis gra
 """
 
 import threading
-from typing import Optional, Dict, Any, ContextManager
 from contextlib import contextmanager
+from typing import Any, ContextManager
 
 from .logging import get_logger
 
@@ -36,11 +36,11 @@ class SynthContext:
         >>> with engine.context():
         ...     osc = Oscillator()  # Uses engine's sample rate
     """
-    
+
     # Thread-local storage for context data
     _local = threading.local()
     _logger = get_logger('core.context')
-    
+
     def __init__(self, sample_rate: int, **kwargs):
         """
         Initialize synthesis context.
@@ -52,19 +52,19 @@ class SynthContext:
         self.sample_rate = sample_rate
         self.parameters = kwargs
         self._logger.debug(f"SynthContext created: sample_rate={sample_rate}, params={kwargs}")
-    
+
     def __enter__(self):
         """Enter the context manager."""
         # Store previous context for nesting support
         previous_context = getattr(self._local, 'context_stack', [])
         previous_context.append(getattr(self._local, 'current_context', None))
-        
+
         self._local.context_stack = previous_context
         self._local.current_context = self
-        
+
         self._logger.debug(f"Entered SynthContext: sample_rate={self.sample_rate}")
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit the context manager."""
         # Restore previous context
@@ -73,9 +73,9 @@ class SynthContext:
             self._local.current_context = context_stack.pop()
         else:
             self._local.current_context = None
-        
+
         self._logger.debug(f"Exited SynthContext: sample_rate={self.sample_rate}")
-    
+
     @classmethod
     def get_current(cls) -> 'SynthContext':
         """
@@ -94,7 +94,7 @@ class SynthContext:
                 "Create modules within a SynthContext or SynthEngine context."
             )
         return current
-    
+
     @classmethod
     def get_sample_rate(cls) -> int:
         """
@@ -107,7 +107,7 @@ class SynthContext:
             ContextError: If no context is currently active
         """
         return cls.get_current().sample_rate
-    
+
     @classmethod
     def get_parameter(cls, name: str, default: Any = None) -> Any:
         """
@@ -125,7 +125,7 @@ class SynthContext:
         """
         context = cls.get_current()
         return context.parameters.get(name, default)
-    
+
     @classmethod
     def has_context(cls) -> bool:
         """
@@ -135,9 +135,9 @@ class SynthContext:
             True if context is available, False otherwise
         """
         return getattr(cls._local, 'current_context', None) is not None
-    
+
     @classmethod
-    def get_context_info(cls) -> Dict[str, Any]:
+    def get_context_info(cls) -> dict[str, Any]:
         """
         Get information about the current context.
         
@@ -154,7 +154,7 @@ class SynthContext:
             'thread_id': threading.get_ident(),
             'context_depth': len(getattr(cls._local, 'context_stack', []))
         }
-    
+
     @classmethod
     @contextmanager
     def temporary(cls, sample_rate: int, **kwargs) -> ContextManager['SynthContext']:
@@ -177,7 +177,7 @@ class SynthContext:
             yield context
 
 
-def get_sample_rate_or_default(sample_rate: Optional[int] = None, 
+def get_sample_rate_or_default(sample_rate: int | None = None,
                               default: int = 48000) -> int:
     """
     Get sample rate from context or use provided/default value.
@@ -202,7 +202,7 @@ def get_sample_rate_or_default(sample_rate: Optional[int] = None,
     """
     if sample_rate is not None:
         return sample_rate
-    
+
     try:
         return SynthContext.get_sample_rate()
     except ContextError:

@@ -6,25 +6,30 @@ all components of the Signals framework including modules, patches, engine, and
 integration scenarios.
 """
 
-import pytest
-import tempfile
 import contextlib
 import shutil
-import numpy as np
-from pathlib import Path
-from typing import Dict, Any, List, Generator
-import yaml
 
 # Add src to path for testing
 import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pytest
+import yaml
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from signals import (
-    SynthEngine, Oscillator, EnvelopeADSR, Mixer, VCA, OutputWav,
-    Signal, SignalType, Patch, PatchTemplate, ModuleGraph,
-    configure_logging, LogLevel
+    VCA,
+    EnvelopeADSR,
+    LogLevel,
+    Mixer,
+    Oscillator,
+    SynthEngine,
+    configure_logging,
 )
-
 
 # Test Configuration
 pytest_plugins = []
@@ -53,7 +58,7 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: Tests that take longer to run"
     )
-    
+
     # Configure logging for tests
     configure_logging(level=LogLevel.ERROR, console=False)
 
@@ -310,7 +315,7 @@ sequence:
 @pytest.fixture
 def create_patch_file():
     """Create patch file for testing."""
-    def _create(temp_dir: Path, patch_data: Dict[str, Any], filename: str = "test_patch.yaml"):
+    def _create(temp_dir: Path, patch_data: dict[str, Any], filename: str = "test_patch.yaml"):
         patch_file = temp_dir / filename
         with open(patch_file, 'w') as f:
             yaml.dump(patch_data, f)
@@ -337,7 +342,7 @@ def signal_generators():
             t = sample_idx / sample_rate
             return amplitude * np.sin(2 * np.pi * frequency * t + phase)
         return generator
-    
+
     def square_wave(frequency=440.0, amplitude=1.0, duty_cycle=0.5):
         """Generate square wave signal."""
         def generator(sample_idx, sample_rate):
@@ -345,7 +350,7 @@ def signal_generators():
             phase = (t * frequency) % 1.0
             return amplitude if phase < duty_cycle else -amplitude
         return generator
-    
+
     def noise(amplitude=1.0, seed=None):
         """Generate noise signal."""
         if seed is not None:
@@ -353,7 +358,7 @@ def signal_generators():
         def generator(sample_idx, sample_rate):
             return amplitude * (np.random.random() * 2.0 - 1.0)
         return generator
-    
+
     return {
         'sine': sine_wave,
         'square': square_wave,
@@ -365,32 +370,32 @@ def signal_generators():
 def performance_timer():
     """Performance timing utility for tests."""
     import time
-    
+
     class Timer:
         def __init__(self):
             self.start_time = None
             self.end_time = None
-        
+
         def start(self):
             self.start_time = time.perf_counter()
             return self
-        
+
         def stop(self):
             self.end_time = time.perf_counter()
             return self
-        
+
         @property
         def elapsed(self):
             if self.start_time is None or self.end_time is None:
                 return None
             return self.end_time - self.start_time
-        
+
         def __enter__(self):
             return self.start()
-        
+
         def __exit__(self, exc_type, exc_val, exc_tb):
             self.stop()
-    
+
     return Timer
 
 
@@ -398,27 +403,26 @@ def performance_timer():
 def timeout_context():
     """Context manager for timeout-based testing."""
     import signal
-    import threading
-    
+
     class TimeoutContext:
         def __init__(self, timeout_seconds=5):
             self.timeout_seconds = timeout_seconds
             self.timed_out = False
-            
+
         def __enter__(self):
             if hasattr(signal, 'SIGALRM'):  # Unix-like systems
                 def timeout_handler(signum, frame):
                     raise TimeoutError(f"Operation timed out after {self.timeout_seconds}s")
-                
+
                 self.old_handler = signal.signal(signal.SIGALRM, timeout_handler)
                 signal.alarm(self.timeout_seconds)
             return self
-            
+
         def __exit__(self, exc_type, exc_val, exc_tb):
             if hasattr(signal, 'SIGALRM'):
                 signal.alarm(0)
                 signal.signal(signal.SIGALRM, self.old_handler)
-    
+
     return TimeoutContext
 
 
@@ -426,35 +430,36 @@ def timeout_context():
 def memory_monitor():
     """Memory usage monitoring for performance tests."""
     try:
-        import psutil
         import os
-        
+
+        import psutil
+
         class MemoryMonitor:
             def __init__(self):
                 self.process = psutil.Process(os.getpid())
                 self.initial_memory = None
                 self.samples = []
-            
+
             def start(self):
                 self.initial_memory = self.process.memory_info().rss / 1024 / 1024  # MB
                 self.samples = [self.initial_memory]
                 return self
-            
+
             def sample(self):
                 current_memory = self.process.memory_info().rss / 1024 / 1024  # MB
                 self.samples.append(current_memory)
                 return current_memory
-            
+
             def get_peak(self):
                 return max(self.samples) if self.samples else 0
-            
+
             def get_growth(self):
                 if len(self.samples) < 2:
                     return 0
                 return max(self.samples) - self.samples[0]
-        
+
         return MemoryMonitor
-        
+
     except ImportError:
         # Fallback for systems without psutil
         class MockMemoryMonitor:
@@ -466,7 +471,7 @@ def memory_monitor():
                 return 0
             def get_growth(self):
                 return 0
-        
+
         return MockMemoryMonitor
 
 
@@ -474,25 +479,25 @@ def memory_monitor():
 def profiler_context():
     """cProfile context manager for performance analysis."""
     import cProfile
-    import pstats
     import io
-    
+    import pstats
+
     class ProfilerContext:
         def __init__(self):
             self.profiler = None
             self.stats = None
-        
+
         def __enter__(self):
             self.profiler = cProfile.Profile()
             self.profiler.enable()
             return self
-        
+
         def __exit__(self, exc_type, exc_val, exc_tb):
             self.profiler.disable()
             s = io.StringIO()
             self.stats = pstats.Stats(self.profiler, stream=s)
             self.stats.sort_stats('cumulative')
-        
+
         def get_stats(self, num_lines=10):
             if self.stats:
                 s = io.StringIO()
@@ -501,19 +506,19 @@ def profiler_context():
                 stats.print_stats(num_lines)
                 return s.getvalue()
             return ""
-        
+
         def get_function_time(self, function_name):
             """Get total time spent in functions containing function_name."""
             if not self.stats:
                 return 0
-            
+
             total_time = 0
             for func_info, (call_count, _, cumulative_time, _, _) in self.stats.stats.items():
                 func_name = func_info[2]
                 if function_name in func_name:
                     total_time += cumulative_time
             return total_time
-    
+
     return ProfilerContext
 
 
@@ -521,18 +526,18 @@ def profiler_context():
 def performance_benchmark():
     """Performance benchmarking utilities."""
     import time
-    
+
     class PerformanceBenchmark:
         def __init__(self):
             self.benchmarks = {}
-        
+
         def time_function(self, func, *args, **kwargs):
             """Time a single function call."""
             start_time = time.perf_counter()
             result = func(*args, **kwargs)
             end_time = time.perf_counter()
             return result, end_time - start_time
-        
+
         def time_multiple(self, func, iterations=100, *args, **kwargs):
             """Time multiple iterations of a function."""
             times = []
@@ -541,7 +546,7 @@ def performance_benchmark():
                 func(*args, **kwargs)
                 end_time = time.perf_counter()
                 times.append(end_time - start_time)
-            
+
             return {
                 'times': times,
                 'avg': sum(times) / len(times),
@@ -549,7 +554,7 @@ def performance_benchmark():
                 'max': max(times),
                 'total': sum(times)
             }
-        
+
         def compare_functions(self, funcs_dict, iterations=100):
             """Compare performance of multiple functions."""
             results = {}
@@ -559,17 +564,17 @@ def performance_benchmark():
                 kwargs = func_info.get('kwargs', {})
                 results[name] = self.time_multiple(func, iterations, *args, **kwargs)
             return results
-        
+
         def assert_performance_bounds(self, timing, max_time_ms, operation_name="Operation"):
             """Assert that timing is within performance bounds."""
             max_time_s = max_time_ms / 1000.0
             assert timing < max_time_s, f"{operation_name} took {timing*1000:.3f}ms, expected <{max_time_ms}ms"
-        
+
         def assert_realtime_factor(self, render_time, audio_duration, max_factor=1.0):
             """Assert that audio rendering maintains realtime performance."""
             realtime_factor = render_time / audio_duration
             assert realtime_factor <= max_factor, f"Realtime factor {realtime_factor:.2f}x exceeds {max_factor}x"
-    
+
     return PerformanceBenchmark
 
 
@@ -581,12 +586,12 @@ def audio_validator():
         def is_valid_range(audio_data, min_val=-1.0, max_val=1.0):
             """Check if audio data is within valid range."""
             return np.all((audio_data >= min_val) & (audio_data <= max_val))
-        
+
         @staticmethod
         def is_not_silent(audio_data, threshold=1e-6):
             """Check if audio data contains non-silent content."""
             return np.any(np.abs(audio_data) > threshold)
-        
+
         @staticmethod
         def has_expected_length(audio_data, sample_rate, duration, tolerance=0.01):
             """Check if audio data has expected length."""
@@ -594,23 +599,23 @@ def audio_validator():
             actual_samples = len(audio_data)
             tolerance_samples = int(sample_rate * tolerance)
             return abs(actual_samples - expected_samples) <= tolerance_samples
-        
+
         @staticmethod
         def compute_rms(audio_data):
             """Compute RMS level of audio data."""
             return np.sqrt(np.mean(audio_data ** 2))
-        
+
         @staticmethod
         def compute_peak(audio_data):
             """Compute peak level of audio data."""
             return np.max(np.abs(audio_data))
-        
+
         @staticmethod
         def has_no_clipping(audio_data, threshold=0.99):
             """Check if audio data has no clipping."""
             peak = AudioValidator.compute_peak(audio_data)
             return peak < threshold
-    
+
     return AudioValidator
 
 
@@ -623,34 +628,34 @@ def patch_validator():
             """Check if patch has required modules."""
             modules = patch_data.get('modules', {})
             return all(module_id in modules for module_id in required_modules)
-        
+
         @staticmethod
         def has_valid_connections(patch_data):
             """Check if patch has valid connections."""
             modules = patch_data.get('modules', {})
             connections = patch_data.get('connections', [])
-            
+
             for conn in connections:
                 source_module = conn['from'].split('.')[0]
                 dest_module = conn['to'].split('.')[0]
-                
+
                 if source_module not in modules or dest_module not in modules:
                     return False
-            
+
             return True
-        
+
         @staticmethod
         def has_valid_sequence(patch_data):
             """Check if patch has valid sequence."""
             modules = patch_data.get('modules', {})
             sequence = patch_data.get('sequence', [])
-            
+
             for event in sequence:
                 if event.get('target') not in modules:
                     return False
-            
+
             return True
-    
+
     return PatchValidator
 
 

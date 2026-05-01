@@ -7,28 +7,37 @@ This module contains the fundamental building blocks used throughout the system:
 - DSP utilities: Low-level audio processing functions
 """
 
-from .module import Module, Signal, SignalType, ParameterType
-from .dsp import write_wav, generate_silence
-from .logging import (
-    get_logger, configure_logging, set_module_log_level,
-    enable_performance_logging, performance_logger,
-    LogContext, LogLevel, log_module_state, log_signal_info
-)
 from .context import (
-    SynthContext, synthesis_context, get_sample_rate_or_default,
-    require_context, ContextError
+    ContextError,
+    SynthContext,
+    get_sample_rate_or_default,
+    require_context,
+    synthesis_context,
 )
+from .dsp import generate_silence, write_wav
+from .logging import (
+    LogContext,
+    LogLevel,
+    configure_logging,
+    enable_performance_logging,
+    get_logger,
+    log_module_state,
+    log_signal_info,
+    performance_logger,
+    set_module_log_level,
+)
+from .module import Module, ParameterType, Signal, SignalType
 
 __all__ = [
     "Module",
-    "Signal", 
+    "Signal",
     "SignalType",
     "ParameterType",
     "write_wav",
     "generate_silence",
     # Logging
     "get_logger",
-    "configure_logging", 
+    "configure_logging",
     "set_module_log_level",
     "enable_performance_logging",
     "performance_logger",

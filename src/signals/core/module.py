@@ -9,7 +9,6 @@ This module provides the fundamental building blocks for the synthesizer:
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional
 
 import numpy as np
 
@@ -90,7 +89,7 @@ class Module(ABC):
     def __init__(self, input_count: int, output_count: int):
         self.input_count = input_count
         self.output_count = output_count
-    
+
     def get_sample_rate_from_context(self, default: int = 48000) -> int:
         """
         Get sample rate from synthesis context or use default.
