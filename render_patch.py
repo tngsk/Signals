@@ -11,25 +11,24 @@ Usage:
     python render_patch.py examples/patches/basic_synth.yaml --duration 5.0 --output custom_output.wav
 """
 
-import sys
 import argparse
+import sys
 from pathlib import Path
-import json
 
 # Add src to path for development
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from signals import SynthEngine, PatchTemplate
-from signals.processing.patch import PatchError
-from signals.processing.engine import EngineError
+from signals import PatchTemplate, SynthEngine
 from signals.core.logging import configure_logging, get_logger
+from signals.processing.engine import EngineError
+from signals.processing.patch import PatchError
 
 
 def parse_variables(vars_string):
     """Parse variable string in format 'key1=value1,key2=value2'."""
     if not vars_string:
         return {}
-    
+
     variables = {}
     for pair in vars_string.split(','):
         if '=' not in pair:
@@ -37,7 +36,7 @@ def parse_variables(vars_string):
         key, value = pair.split('=', 1)
         key = key.strip()
         value = value.strip()
-        
+
         # Try to convert to appropriate type
         if value.lower() == 'true':
             variables[key] = True
@@ -47,7 +46,7 @@ def parse_variables(vars_string):
             variables[key] = float(value) if '.' in value else int(value)
         else:
             variables[key] = value
-    
+
     return variables
 
 
@@ -63,79 +62,79 @@ Examples:
   %(prog)s examples/templates/parametric_synth.yaml --info --vars "osc_freq=440"
         """
     )
-    
+
     parser.add_argument(
         'patch_file',
         help='Path to patch file (.yaml)'
     )
-    
+
     parser.add_argument(
         '--duration', '-d',
         type=float,
         help='Audio duration in seconds (default: use patch sequence duration or 2.0s)'
     )
-    
+
     parser.add_argument(
         '--output', '-o',
         help='Output audio file path (default: use patch filename parameter or auto-generate)'
     )
-    
+
     parser.add_argument(
         '--vars', '-v',
         help='Template variables in format "key1=value1,key2=value2"'
     )
-    
+
     parser.add_argument(
         '--sample-rate', '-r',
         type=int,
         default=48000,
         help='Sample rate in Hz (default: 48000)'
     )
-    
+
     parser.add_argument(
         '--info', '-i',
         action='store_true',
         help='Show patch information without rendering'
     )
-    
+
     parser.add_argument(
         '--features', '-f',
         action='store_true',
         help='Extract and display audio features after rendering'
     )
-    
+
     parser.add_argument(
         '--quiet', '-q',
         action='store_true',
         help='Suppress output messages'
     )
-    
+
     parser.add_argument(
         '--log-level', '-l',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
         default='WARNING',
         help='Set logging level (default: WARNING)'
     )
-    
+
     parser.add_argument(
         '--log-file',
         help='Optional log file path'
     )
-    
+
     parser.add_argument(
         '--verbose',
         action='store_true',
         help='Enable verbose logging (sets log level to INFO)'
     )
-    
+
     parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug logging (sets log level to DEBUG)'
     )
-    
+
     args = parser.parse_args()
-    
+
     # Configure logging based on arguments
     log_level = args.log_level
     if args.debug:
@@ -144,44 +143,44 @@ Examples:
         log_level = 'INFO'
     elif args.quiet:
         log_level = 'ERROR'
-    
+
     configure_logging(
         level=log_level,
         console=not args.quiet,
         file_path=args.log_file,
         performance_logging=args.debug
     )
-    
+
     logger = get_logger('render_patch')
     logger.info(f"Starting render_patch with log level: {log_level}")
-    
+
     # Validate patch file
     patch_path = Path(args.patch_file)
     if not patch_path.exists():
         logger.error(f"Patch file '{patch_path}' not found")
         print(f"Error: Patch file '{patch_path}' not found", file=sys.stderr)
         return 1
-    
-    if not patch_path.suffix.lower() in ['.yaml', '.yml']:
-        logger.error(f"Patch file must be a YAML file (.yaml or .yml)")
-        print(f"Error: Patch file must be a YAML file (.yaml or .yml)", file=sys.stderr)
+
+    if patch_path.suffix.lower() not in ['.yaml', '.yml']:
+        logger.error("Patch file must be a YAML file (.yaml or .yml)")
+        print("Error: Patch file must be a YAML file (.yaml or .yml)", file=sys.stderr)
         return 1
-    
+
     try:
         # Create engine
         logger.info(f"Creating SynthEngine with sample_rate={args.sample_rate}")
         engine = SynthEngine(sample_rate=args.sample_rate)
-        
+
         # Parse variables if provided
         variables = parse_variables(args.vars) if args.vars else None
-        
+
         # Check if this is a template by looking for variables
         is_template = False
         if variables is not None or args.info:
             try:
                 template = PatchTemplate(patch_path)
                 is_template = True
-                
+
                 if args.info:
                     if not args.quiet:
                         print(f"Template: {patch_path}")
@@ -193,31 +192,31 @@ Examples:
                                 print(f"  {var}: {default}")
                         else:
                             print("No default values defined")
-                    
+
                     if not variables:
                         return 0
-                        
+
             except Exception:
                 # Not a template, continue as regular patch
                 pass
-        
+
         # Load patch
         if not args.quiet:
             action = "Loading template" if (is_template and variables) else "Loading patch"
             print(f"{action}: {patch_path}")
             if variables:
                 print(f"Variables: {variables}")
-        
+
         if variables:
             patch = engine.load_patch(patch_path, variables=variables)
         else:
             patch = engine.load_patch(patch_path)
-        
+
         # Show patch info
         if args.info:
             info = engine.get_patch_info()
             if not args.quiet:
-                print(f"\nPatch Information:")
+                print("\nPatch Information:")
                 print(f"  Name: {info['name']}")
                 print(f"  Description: {info.get('description', 'N/A')}")
                 print(f"  Sample rate: {info['sample_rate']} Hz")
@@ -227,30 +226,30 @@ Examples:
                 print(f"  Duration: {info['duration']}s")
                 if 'execution_order' in info:
                     print(f"  Execution order: {info['execution_order']}")
-            
+
             if args.duration is None:
                 return 0
-        
+
         # Determine duration
         duration = args.duration
         # If no duration specified, let engine calculate automatically (including envelope release)
-        
+
         # Render audio
         if duration is not None:
             if not args.quiet:
                 print(f"Rendering {duration}s of audio...")
         else:
             if not args.quiet:
-                print(f"Rendering audio with automatic duration calculation...")
-        
+                print("Rendering audio with automatic duration calculation...")
+
         output_file = args.output
         audio_data = engine.render(duration=duration, output_file=output_file)
-        
+
         # Extract features if requested
         if args.features:
             features = engine.export_features(audio_data)
             if not args.quiet:
-                print(f"\nAudio Features:")
+                print("\nAudio Features:")
                 print(f"  Length: {features['length_seconds']:.2f}s")
                 print(f"  Samples: {features['length_samples']}")
                 print(f"  Peak level: {features['peak']:.3f}")
@@ -260,25 +259,25 @@ Examples:
                     print(f"  Spectral centroid: {features['spectral_centroid']:.1f}")
                 if 'spectral_rolloff' in features:
                     print(f"  Spectral rolloff: {features['spectral_rolloff']:.1f}")
-        
+
         # Determine output filename for display
         if not output_file:
             # Look for output module in patch
             info = engine.get_patch_info()
             output_file = "Generated by patch output module"
-        
+
         if not args.quiet:
             actual_duration = len(audio_data) / args.sample_rate
-            print(f"✅ Audio rendered successfully")
+            print("✅ Audio rendered successfully")
             if output_file != "Generated by patch output module":
                 print(f"   Output: {output_file}")
             print(f"   Duration: {actual_duration:.1f}s")
             print(f"   Samples: {len(audio_data)}")
             print(f"   Sample rate: {args.sample_rate} Hz")
-        
+
         logger.info("Patch rendering completed successfully")
         return 0
-        
+
     except PatchError as e:
         logger.error(f"Patch error: {e}")
         print(f"Patch error: {e}", file=sys.stderr)

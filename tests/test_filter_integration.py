@@ -6,16 +6,19 @@ envelopes, and the patch system to ensure proper audio processing chains.
 """
 
 import math
-import pytest
+
 import numpy as np
+import pytest
+
 from signals import (
-    Oscillator, EnvelopeADSR, VCA, Mixer, OutputWav,
-    Signal, SignalType, WaveformType
+    VCA,
+    EnvelopeADSR,
+    Mixer,
+    Oscillator,
+    WaveformType,
 )
-from signals.modules.filter import Filter, FilterType
 from signals.core.context import SynthContext
-from signals.processing.engine import SynthEngine
-from signals.processing.patch import PatchTemplate
+from signals.modules.filter import Filter, FilterType
 
 
 @pytest.mark.integration

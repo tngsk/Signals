@@ -7,14 +7,13 @@ in the synthesizer. The envelope responds to trigger signals and provides
 smooth transitions between different phases.
 """
 
-import numpy as np
-import re
 import math
-from typing import Union, Optional
 
-from ..core.module import Module, ParameterType, Signal, SignalType
+import numpy as np
+
 from ..core.context import get_sample_rate_or_default
-from ..core.logging import get_logger, performance_logger, log_module_state
+from ..core.logging import get_logger, performance_logger
+from ..core.module import Module, ParameterType, Signal, SignalType
 
 
 class EnvelopeADSR(Module):
@@ -52,32 +51,32 @@ class EnvelopeADSR(Module):
         >>> env.trigger_off()  # Begin release phase
     """
 
-    def __init__(self, sample_rate: Optional[int] = None):
+    def __init__(self, sample_rate: int | None = None):
         super().__init__(input_count=1, output_count=1)  # Input for trigger
         self.sample_rate = get_sample_rate_or_default(sample_rate)
         self.logger = get_logger('modules.envelope')
-        
+
         # Original time-based parameters
         self.attack_time: float = 0.05  # seconds
         self.decay_time: float = 0.1  # seconds
         self.sustain_level: float = 0.7  # 0.0 to 1.0
         self.release_time: float = 0.2  # seconds
-        
+
         # Anti-click configuration
         # 5ms minimum balances click prevention with musical expression
         # Shorter times would cause audible artifacts, longer times would
         # interfere with musical techniques like staccato and percussion
         self.min_release_time: float = 0.005  # 5ms minimum to prevent clicks
         self.use_exponential_release: bool = True  # Use exponential decay for smoother release
-        
+
         # Enhanced parameter storage (raw values as entered by user)
-        self._attack_param: Union[str, float] = 0.05
-        self._decay_param: Union[str, float] = 0.1
-        self._release_param: Union[str, float] = 0.2
-        
+        self._attack_param: str | float = 0.05
+        self._decay_param: str | float = 0.1
+        self._release_param: str | float = 0.2
+
         # Total duration for relative calculations (set externally or auto-detected)
         self._total_duration: float = 2.0  # Default duration
-        
+
         # Auto mode calculation flags
         self._auto_attack: bool = False
         self._auto_decay: bool = False
@@ -91,11 +90,11 @@ class EnvelopeADSR(Module):
         self._current_sample: int = 0
         self._value: float = 0.0
         self._note_on: bool = False
-        
+
         # Anti-click state
         self._release_start_value: float = 0.0  # Value when release starts
         self._release_coefficient: float = 0.0  # Exponential decay coefficient
-        
+
         self.logger.debug(f"EnvelopeADSR initialized: sample_rate={self.sample_rate}")
 
     def set_parameter(self, name: str, value: ParameterType):
@@ -282,8 +281,8 @@ class EnvelopeADSR(Module):
             self._current_sample += 1
 
         return [Signal(SignalType.CONTROL, np.clip(self._value, 0.0, 1.0))]
-    
-    def _parse_time_parameter(self, value: Union[str, float]) -> float:
+
+    def _parse_time_parameter(self, value: str | float) -> float:
         """
         Parse a time parameter that can be in various formats.
         
@@ -295,7 +294,7 @@ class EnvelopeADSR(Module):
         """
         if isinstance(value, str):
             value_str = value.strip()
-            
+
             # Percentage format (e.g., "5%", "20%")
             if value_str.endswith('%'):
                 try:
@@ -304,88 +303,88 @@ class EnvelopeADSR(Module):
                 except ValueError:
                     self.logger.warning(f"Invalid percentage format '{value}', using 0.1 seconds")
                     return 0.1
-            
+
             # Try to parse as plain number string (treat as seconds)
             try:
                 return float(value_str)
             except ValueError:
                 self.logger.warning(f"Unable to parse time parameter '{value}', using 0.1 seconds")
                 return 0.1
-        
+
         elif isinstance(value, (int, float)):
             # All numeric values are treated as seconds
             return float(value)
-        
+
         else:
             self.logger.warning(f"Invalid time parameter type for '{value}', using 0.1 seconds")
             return 0.1
-    
+
     def _recalculate_times(self):
         """Recalculate all time parameters when total_duration changes."""
         if not self._auto_attack:
             self.attack_time = self._parse_time_parameter(self._attack_param)
             self._attack_samples = int(self.attack_time * self.sample_rate)
-        
+
         if not self._auto_decay:
             self.decay_time = self._parse_time_parameter(self._decay_param)
             self._decay_samples = int(self.decay_time * self.sample_rate)
-        
+
         if not self._auto_release:
             requested_time = self._parse_time_parameter(self._release_param)
             self.release_time = max(requested_time, self.min_release_time)
             self._release_samples = int(self.release_time * self.sample_rate)
             self._update_release_coefficient()
-        
+
         self._recalculate_auto_times()
-    
+
     def _recalculate_auto_times(self):
         """Recalculate auto parameters based on total duration and other set parameters."""
         # Calculate the total used time by non-auto parameters
         used_time = 0.0
         auto_count = 0
-        
+
         if not self._auto_attack:
             used_time += self.attack_time
         else:
             auto_count += 1
-        
+
         if not self._auto_decay:
             used_time += self.decay_time
         else:
             auto_count += 1
-        
+
         if not self._auto_release:
             used_time += self.release_time
         else:
             auto_count += 1
-        
+
         # Calculate remaining time for auto parameters
         if auto_count > 0:
             # Reserve some time for sustain (minimum 10% of total duration)
             reserved_sustain_time = max(0.1 * self._total_duration, 0.1)
             available_time = max(0.0, self._total_duration - used_time - reserved_sustain_time)
             auto_time_each = available_time / auto_count if auto_count > 0 else 0.0
-            
+
             # Ensure minimum time for each auto parameter (with anti-click minimum)
             # Use 10ms for auto mode to be more conservative when user doesn't specify exact times
             min_time = max(0.01, self.min_release_time)  # At least 10ms or anti-click minimum
             auto_time_each = max(auto_time_each, min_time)
-            
 
-            
+
+
             if self._auto_attack:
                 self.attack_time = auto_time_each
                 self._attack_samples = int(self.attack_time * self.sample_rate)
-            
+
             if self._auto_decay:
                 self.decay_time = auto_time_each
                 self._decay_samples = int(self.decay_time * self.sample_rate)
-            
+
             if self._auto_release:
                 self.release_time = max(auto_time_each, self.min_release_time)
                 self._release_samples = int(self.release_time * self.sample_rate)
                 self._update_release_coefficient()
-    
+
     def set_total_duration(self, duration: float):
         """
         Set the total duration for relative calculations.
@@ -395,18 +394,18 @@ class EnvelopeADSR(Module):
         """
         self._total_duration = duration
         self._recalculate_times()
-        
+
         # Log the final envelope configuration
         total_envelope_time = self.attack_time + self.decay_time + self.release_time
         self.logger.info(f"Envelope timing configured - Total: {duration:.3f}s, "
                         f"A:{self.attack_time:.3f}s, D:{self.decay_time:.3f}s, "
                         f"S:{self.sustain_level:.2f}, R:{self.release_time:.3f}s, "
                         f"ADSR_total: {total_envelope_time:.3f}s")
-        
+
         if total_envelope_time > duration:
             self.logger.warning(f"ADSR total ({total_envelope_time:.3f}s) exceeds "
                               f"duration ({duration:.3f}s) by {total_envelope_time - duration:.3f}s")
-    
+
     def get_info(self) -> dict:
         """
         Get current envelope information including calculated times.
@@ -432,7 +431,7 @@ class EnvelopeADSR(Module):
             'use_exponential_release': self.use_exponential_release,
             'release_coefficient': self._release_coefficient
         }
-    
+
     def _update_release_coefficient(self):
         """Update the exponential release coefficient for smooth decay."""
         if self.release_time > 0 and self.use_exponential_release:
@@ -443,7 +442,7 @@ class EnvelopeADSR(Module):
             self._release_coefficient = -math.log(0.001) / (self.release_time * self.sample_rate)
         else:
             self._release_coefficient = 0.0
-    
+
     def set_anti_click_mode(self, enabled: bool, min_time: float = 0.005):
         """
         Configure anti-click behavior.
@@ -459,12 +458,12 @@ class EnvelopeADSR(Module):
         """
         self.min_release_time = min_time if enabled else 0.0
         self.use_exponential_release = enabled
-        
+
         # Recalculate current release if needed
         if not self._auto_release:
             requested_time = self._parse_time_parameter(self._release_param)
             self.release_time = max(requested_time, self.min_release_time)
             self._release_samples = int(self.release_time * self.sample_rate)
             self._update_release_coefficient()
-        
+
         self.logger.info(f"Anti-click mode {'enabled' if enabled else 'disabled'}, min_time={min_time*1000:.1f}ms")

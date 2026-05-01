@@ -8,13 +8,12 @@ frequency and amplitude modulation and maintains phase continuity.
 
 import math
 from enum import Enum
-from typing import Optional
 
 import numpy as np
 
-from ..core.module import Module, ParameterType, Signal, SignalType
 from ..core.context import get_sample_rate_or_default
-from ..core.logging import get_logger, performance_logger, log_module_state
+from ..core.logging import get_logger, performance_logger
+from ..core.module import Module, ParameterType, Signal, SignalType
 
 
 class WaveformType(Enum):
@@ -68,7 +67,7 @@ class Oscillator(Module):
         >>> signal = osc.process()[0]
     """
 
-    def __init__(self, sample_rate: Optional[int] = None, waveform: WaveformType = WaveformType.SINE):
+    def __init__(self, sample_rate: int | None = None, waveform: WaveformType = WaveformType.SINE):
         super().__init__(
             input_count=1, output_count=1
         )  # Input for frequency modulation
@@ -78,7 +77,7 @@ class Oscillator(Module):
         self.phase: float = 0.0
         self.amplitude: float = 1.0
         self.logger = get_logger('modules.oscillator')
-        
+
         self.logger.debug(f"Oscillator initialized: sample_rate={self.sample_rate}, waveform={waveform.value}")
 
     def set_parameter(self, name: str, value: ParameterType):

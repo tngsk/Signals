@@ -6,11 +6,10 @@ by a control voltage signal, enabling dynamic amplitude control through
 envelopes, LFOs, or other modulation sources.
 """
 
-from typing import Optional
 
-from ..core.module import Module, ParameterType, Signal, SignalType
 from ..core.context import get_sample_rate_or_default
-from ..core.logging import get_logger, performance_logger, log_module_state
+from ..core.logging import get_logger, performance_logger
+from ..core.module import Module, ParameterType, Signal, SignalType
 
 
 class VCA(Module):
@@ -41,12 +40,12 @@ class VCA(Module):
         >>> modulated_signal = vca.process([audio_signal, cv_signal])[0]
     """
 
-    def __init__(self, sample_rate: Optional[int] = None):
+    def __init__(self, sample_rate: int | None = None):
         super().__init__(input_count=2, output_count=1)  # Audio input + CV input
         self.sample_rate = get_sample_rate_or_default(sample_rate)
         self.gain: float = 1.0
         self.logger = get_logger('modules.vca')
-        
+
         self.logger.debug(f"VCA initialized: sample_rate={self.sample_rate}")
 
     def set_parameter(self, name: str, value: ParameterType):
@@ -96,11 +95,11 @@ class VCA(Module):
             cv_input = inputs[1]
 
             # Process only if we have proper signal types
-            if (audio_input.type == SignalType.AUDIO and 
+            if (audio_input.type == SignalType.AUDIO and
                 cv_input.type in [SignalType.CONTROL, SignalType.AUDIO]):
-                
+
                 output_value = audio_input.value * cv_input.value * self.gain
-                
+
         elif inputs and len(inputs) == 1:
             # If only audio input provided, apply base gain only
             audio_input = inputs[0]

@@ -6,14 +6,14 @@ configurable output levels, and performance-optimized logging for audio processi
 Supports both console and file output with structured formatting.
 """
 
+import functools
 import logging
 import logging.handlers
 import sys
-from pathlib import Path
-from typing import Optional, Union, Dict, Any
-from enum import Enum
 import time
-import functools
+from enum import Enum
+from pathlib import Path
+from typing import Any, Optional
 
 
 class LogLevel(Enum):
@@ -32,53 +32,53 @@ class SignalsLogger:
     Provides hierarchical logging with module-specific loggers, configurable
     output destinations, and performance-optimized logging for real-time audio processing.
     """
-    
+
     _instance: Optional['SignalsLogger'] = None
     _initialized: bool = False
-    
+
     def __new__(cls) -> 'SignalsLogger':
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         if self._initialized:
             return
-        
-        self._loggers: Dict[str, logging.Logger] = {}
+
+        self._loggers: dict[str, logging.Logger] = {}
         self._log_level = LogLevel.INFO
         self._console_enabled = True
         self._file_enabled = False
-        self._file_path: Optional[Path] = None
+        self._file_path: Path | None = None
         self._formatter = self._create_formatter()
         self._performance_logging = False
-        
+
         # Initialize root logger
         self._setup_root_logger()
         self._initialized = True
-    
+
     def _create_formatter(self) -> logging.Formatter:
         """Create a structured log formatter."""
         return logging.Formatter(
             fmt='%(asctime)s | %(name)-20s | %(levelname)-8s | %(message)s',
             datefmt='%H:%M:%S'
         )
-    
+
     def _setup_root_logger(self):
         """Setup the root logger for the Signals framework."""
         root_logger = logging.getLogger('signals')
         root_logger.setLevel(self._log_level.value)
-        
+
         # Remove existing handlers
         for handler in root_logger.handlers[:]:
             root_logger.removeHandler(handler)
-        
+
         # Console handler
         if self._console_enabled:
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setFormatter(self._formatter)
             root_logger.addHandler(console_handler)
-        
+
         # File handler
         if self._file_enabled and self._file_path:
             file_handler = logging.handlers.RotatingFileHandler(
@@ -88,9 +88,9 @@ class SignalsLogger:
             )
             file_handler.setFormatter(self._formatter)
             root_logger.addHandler(file_handler)
-        
+
         self._loggers['signals'] = root_logger
-    
+
     def get_logger(self, name: str) -> logging.Logger:
         """
         Get or create a logger for a specific module.
@@ -105,13 +105,13 @@ class SignalsLogger:
             logger = logging.getLogger(name)
             logger.setLevel(self._log_level.value)
             self._loggers[name] = logger
-        
+
         return self._loggers[name]
-    
-    def configure(self, 
-                  level: Union[LogLevel, str] = LogLevel.INFO,
+
+    def configure(self,
+                  level: LogLevel | str = LogLevel.INFO,
                   console: bool = True,
-                  file_path: Optional[Union[str, Path]] = None,
+                  file_path: str | Path | None = None,
                   performance_logging: bool = False):
         """
         Configure the logging system.
@@ -125,21 +125,21 @@ class SignalsLogger:
         # Convert string level to enum
         if isinstance(level, str):
             level = LogLevel[level.upper()]
-        
+
         self._log_level = level
         self._console_enabled = console
         self._file_enabled = file_path is not None
         self._file_path = Path(file_path) if file_path else None
         self._performance_logging = performance_logging
-        
+
         # Recreate root logger with new settings
         self._setup_root_logger()
-        
+
         # Update existing loggers
         for logger in self._loggers.values():
             logger.setLevel(level.value)
-    
-    def set_module_level(self, module_name: str, level: Union[LogLevel, str]):
+
+    def set_module_level(self, module_name: str, level: LogLevel | str):
         """
         Set log level for a specific module.
         
@@ -149,15 +149,15 @@ class SignalsLogger:
         """
         if isinstance(level, str):
             level = LogLevel[level.upper()]
-        
+
         full_name = f"signals.modules.{module_name}"
         logger = self.get_logger(full_name)
         logger.setLevel(level.value)
-    
+
     def enable_performance_logging(self, enabled: bool = True):
         """Enable or disable performance logging."""
         self._performance_logging = enabled
-    
+
     def is_performance_logging_enabled(self) -> bool:
         """Check if performance logging is enabled."""
         return self._performance_logging
@@ -199,7 +199,7 @@ def configure_logging(**kwargs):
     _signals_logger.configure(**kwargs)
 
 
-def set_module_log_level(module_name: str, level: Union[LogLevel, str]):
+def set_module_log_level(module_name: str, level: LogLevel | str):
     """
     Set log level for a specific module.
     
@@ -235,21 +235,21 @@ def performance_logger(func):
     def wrapper(*args, **kwargs):
         if not _signals_logger.is_performance_logging_enabled():
             return func(*args, **kwargs)
-        
+
         start_time = time.perf_counter()
         result = func(*args, **kwargs)
         end_time = time.perf_counter()
-        
+
         execution_time = (end_time - start_time) * 1000  # Convert to milliseconds
-        
+
         # Get logger for the function's module
         module_name = func.__module__.replace('signals.', '') if func.__module__ else 'unknown'
         logger = get_logger(module_name)
-        
+
         logger.debug(f"{func.__qualname__}: {execution_time:.3f}ms")
-        
+
         return result
-    
+
     return wrapper
 
 
@@ -263,25 +263,25 @@ class LogContext:
             oscillator.process()
         # Log level restored
     """
-    
-    def __init__(self, logger_name: str, level: Union[LogLevel, str]):
+
+    def __init__(self, logger_name: str, level: LogLevel | str):
         self.logger_name = logger_name
         self.new_level = LogLevel[level.upper()] if isinstance(level, str) else level
         self.original_level = None
         self.logger = None
-    
+
     def __enter__(self):
         self.logger = get_logger(self.logger_name)
         self.original_level = self.logger.level
         self.logger.setLevel(self.new_level.value)
         return self.logger
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.logger and self.original_level is not None:
             self.logger.setLevel(self.original_level)
 
 
-def log_module_state(logger: logging.Logger, module_name: str, state: Dict[str, Any]):
+def log_module_state(logger: logging.Logger, module_name: str, state: dict[str, Any]):
     """
     Log module state information in a structured format.
     

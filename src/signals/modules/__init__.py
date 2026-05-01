@@ -9,17 +9,17 @@ or output audio signals:
 - OutputWav: WAV file output module
 """
 
-from .oscillator import Oscillator
 from .envelope import EnvelopeADSR
-from .mixer import Mixer
-from .output import OutputWav
-from .vca import VCA
 from .filter import Filter
 from .lfo import LFO
+from .mixer import Mixer
+from .oscillator import Oscillator
+from .output import OutputWav
+from .vca import VCA
 
 __all__ = [
     "Oscillator",
-    "EnvelopeADSR", 
+    "EnvelopeADSR",
     "Mixer",
     "OutputWav",
     "VCA",

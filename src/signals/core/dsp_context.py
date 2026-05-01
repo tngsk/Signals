@@ -6,14 +6,15 @@ allowing them to automatically use the current synthesis context's sample rate
 while maintaining backward compatibility with explicit parameter specification.
 """
 
-from typing import Optional
+
 import numpy as np
 
-from .dsp import generate_silence as _generate_silence, write_wav as _write_wav
-from .context import SynthContext, ContextError
+from .context import ContextError, SynthContext
+from .dsp import generate_silence as _generate_silence
+from .dsp import write_wav as _write_wav
 
 
-def generate_silence(silence_duration: float, sample_rate: Optional[int] = None) -> np.ndarray:
+def generate_silence(silence_duration: float, sample_rate: int | None = None) -> np.ndarray:
     """
     Generate silence with automatic sample rate from context.
     
@@ -47,14 +48,14 @@ def generate_silence(silence_duration: float, sample_rate: Optional[int] = None)
                 "No sample_rate provided and no synthesis context available. "
                 "Either provide sample_rate explicitly or use within a synthesis context."
             )
-    
+
     return _generate_silence(silence_duration, sample_rate)
 
 
 def write_wav(
-    filename: str, 
-    samples: np.ndarray, 
-    sample_rate: Optional[int] = None, 
+    filename: str,
+    samples: np.ndarray,
+    sample_rate: int | None = None,
     bits_per_sample: int = 16
 ):
     """
@@ -89,7 +90,7 @@ def write_wav(
                 "No sample_rate provided and no synthesis context available. "
                 "Either provide sample_rate explicitly or use within a synthesis context."
             )
-    
+
     return _write_wav(filename, samples, sample_rate, bits_per_sample)
 
 
@@ -139,7 +140,7 @@ from .dsp import write_wav as write_wav_explicit
 
 __all__ = [
     'generate_silence',
-    'write_wav', 
+    'write_wav',
     'get_context_sample_rate',
     'has_context',
     'generate_silence_explicit',

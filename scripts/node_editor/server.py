@@ -1,10 +1,10 @@
 import http.server
-import socketserver
 import json
-import yaml
-import os
+import socketserver
 import subprocess
 from pathlib import Path
+
+import yaml
 
 PORT = 8000
 DIRECTORY = Path(__file__).parent
