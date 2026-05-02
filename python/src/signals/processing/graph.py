@@ -28,7 +28,7 @@ class CyclicGraphError(GraphError):
 class ModuleGraphNode:
     """
     Represents a node in the module graph.
-    
+
     Each node contains a module instance and tracks its connections
     to other nodes in the graph.
     """
@@ -65,7 +65,7 @@ class ModuleGraphNode:
 class ModuleGraph:
     """
     Manages the complete module graph and signal processing pipeline.
-    
+
     Handles module instantiation, connection management, topological sorting
     for execution order, and sample-by-sample processing of the entire graph.
     """
@@ -165,7 +165,7 @@ class ModuleGraph:
         in_degree = dict.fromkeys(self.nodes.keys(), 0)
 
         for node in self.nodes.values():
-            for input_connections in node.input_connections.values():
+            for _ in node.input_connections.values():
                 in_degree[node.module_id] += 1
 
         # Find nodes with no incoming edges
@@ -198,7 +198,7 @@ class ModuleGraph:
     def process_sample(self) -> dict[str, list[Signal]]:
         """
         Process one sample through the entire graph using the SignalStore.
-        
+
         Returns dictionary mapping module IDs to their output signals.
         """
         # Process sequence events for current time
@@ -258,11 +258,11 @@ class ModuleGraph:
                         progress_callback: Callable | None = None) -> dict[str, list[list[Signal]]]:
         """
         Process the graph for a specified duration.
-        
+
         Args:
             duration: Duration in seconds to process
             progress_callback: Optional callback for progress updates
-            
+
         Returns:
             Dictionary mapping module IDs to lists of their output signals over time
         """
