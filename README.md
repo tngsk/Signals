@@ -6,8 +6,8 @@ A modern modular synthesizer framework designed to load C++ patches exported fro
 
 Signals provides a toolkit for building digital audio synthesizers, focusing on loading and combining RNBO DSP modules. The architecture consists of:
 
-1. **Rust Core Engine (`rust/`)**: The main audio processing engine. It manages the module graph and executes block-based (buffer) audio processing. It natively binds C++ RNBO patches via `cxx` to be used as modules.
-2. **Python Framework (`python/`)**: A high-level API and declarative YAML patch configurations that bridge down to the Rust engine. (Note: The legacy Python core engine implementation is being deprecated in favor of the Rust core engine).
+1. **Rust Core Engine (`rust/`)**: The main real-time audio processing engine. It manages the module graph and executes high-performance block-based (buffer) audio processing. It natively binds C++ RNBO patches via `cxx` to be used as modules.
+2. **Python Framework (`python/`)**: A toolkit restricted to high-level API usage, test orchestration, and declarative YAML patch generation. **Python is strictly isolated from the real-time DSP pipeline**; there are no cross-language bindings passing audio data between Python and Rust.
 3. **Visual Node Editor (`python/scripts/node_editor/`)**: A frontend for designing synthesizer patches visually in Vanilla JS + HTML5, interacting with a Python backend.
 
 ## Project Structure
