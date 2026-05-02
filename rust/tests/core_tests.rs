@@ -27,6 +27,23 @@ fn test_signal_store() {
 }
 
 #[test]
+fn test_module_graph_new() {
+    let sample_rate = 44100;
+    let block_size = 64;
+    let graph = ModuleGraph::new(sample_rate, block_size);
+
+    assert_eq!(graph.sample_rate, sample_rate);
+    assert_eq!(graph.block_size, block_size);
+    assert!(graph.nodes.is_empty());
+    assert!(graph.execution_order.is_empty());
+    assert!(graph.input_connections.is_empty());
+    assert!(graph.output_connections.is_empty());
+
+    // Verify signal store initialization via its behavior
+    assert_eq!(graph.store.get_or_zeros("any_key").len(), block_size);
+}
+
+#[test]
 fn test_module_graph() {
     let mut graph = ModuleGraph::new(48000, 4);
 
