@@ -5,10 +5,9 @@ edition = "2024"
 
 [lib]
 name = "rnbo_analog_rust"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }
 hound = "3.5"
-pyo3 = { version = "0.21.2", features = ["extension-module"] }
 rand = "0.8.5"

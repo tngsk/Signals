@@ -1,4 +1,3 @@
-use pyo3::prelude::*;
 use std::f32::consts::PI;
 
 /// A simple ADSR envelope generator
@@ -100,17 +99,13 @@ impl AdsrEnvelope {
 }
 
 /// AnalogOscillator implementation in Rust
-#[pyclass(module = "rnbo_analog_rust")]
 pub struct AnalogOscillator {
     pub sample_rate: f32,
     pub mode: u32,
     phase: f32,
 }
 
-#[pymethods]
 impl AnalogOscillator {
-    #[new]
-    #[pyo3(signature = (sample_rate=48000.0, mode=2))]
     pub fn new(sample_rate: f32, mode: u32) -> Self {
         Self {
             sample_rate,
@@ -133,9 +128,7 @@ impl AnalogOscillator {
         self.process_block(&freq, &mut out);
         out
     }
-}
 
-impl AnalogOscillator {
     pub fn process_block(&mut self, freq: &[f32], out: &mut [f32]) {
         for (f, o) in freq.iter().zip(out.iter_mut()) {
             let phase_inc = f / self.sample_rate;
@@ -182,13 +175,6 @@ impl AnalogOscillator {
             }
         }
     }
-}
-
-/// A Python module implemented in Rust.
-#[pymodule]
-fn rnbo_analog_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<AnalogOscillator>()?;
-    Ok(())
 }
 
 #[cfg(test)]
