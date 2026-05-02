@@ -1,0 +1,14 @@
+[package]
+name = "rnbo_analog_rust"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "rnbo_analog_rust"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+hound = "3.5"
+pyo3 = { version = "0.21.2", features = ["extension-module"] }
+rand = "0.8.5"

@@ -8,3 +8,9 @@ cxx = "1.0.194"
 
 [build-dependencies]
 cxx-build = "1.0.194"
+
+[workspace]
+members = [
+    ".",
+    "rnbo_analog_rust"
+]
