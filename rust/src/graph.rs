@@ -133,4 +133,10 @@ impl ModuleGraph {
 
         outputs
     }
+
+    pub fn handle_message(&mut self, target_id: &str, msg: &str) {
+        if let Some(node) = self.nodes.get_mut(target_id) {
+            node.module.handle_message(msg);
+        }
+    }
 }

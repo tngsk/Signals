@@ -14,6 +14,9 @@ pub trait Module {
     /// Inputs are provided as a vector of vectors (each inner vector is a block for one input channel).
     /// Returns a vector of vectors containing the output blocks.
     fn process(&mut self, inputs: &[Vec<f64>]) -> Vec<Vec<f64>>;
+
+    /// Handle dynamic control messages like trigger/release
+    fn handle_message(&mut self, _msg: &str) {}
 }
 
 /// A node in the graph wrapping a `Module` with its input and output bus mapping.
