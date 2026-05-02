@@ -111,6 +111,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             super().do_POST()
 
 if __name__ == "__main__":
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
+    with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
         print(f"Serving node editor at http://localhost:{PORT}")
         httpd.serve_forever()
