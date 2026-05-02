@@ -194,6 +194,7 @@ class ModuleGraph:
     def _prepare_sequence(self):
         """Prepare sequence events for processing."""
         self.sequence_events = sorted(self.patch.sequence, key=lambda e: e.time)
+        self._next_event_idx = 0
 
     def process_sample(self) -> dict[str, list[Signal]]:
         """
@@ -227,11 +228,23 @@ class ModuleGraph:
     def _process_sequence_events(self):
         """Process any sequence events that should occur at current time."""
         current_sample_time = self.current_time
+        half_sample = 0.5 / self.sample_rate
 
-        for event in self.sequence_events:
-            # Check if event should trigger (within one sample period)
-            if abs(event.time - current_sample_time) < (0.5 / self.sample_rate):
+        # Sequence events are sorted by time. Use a cursor to process only
+        # events that fall within the current sample period or have passed.
+        while self._next_event_idx < len(self.sequence_events):
+            event = self.sequence_events[self._next_event_idx]
+
+            # If event is in the future, we're done for this sample
+            if event.time > current_sample_time + half_sample:
+                break
+
+            # If event should trigger (within one sample period)
+            if abs(event.time - current_sample_time) < half_sample:
                 self._execute_sequence_event(event)
+
+            # Advance cursor (for both processed and stale events)
+            self._next_event_idx += 1
 
     def _execute_sequence_event(self, event: SequenceEvent):
         """Execute a single sequence event."""
