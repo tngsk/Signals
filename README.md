@@ -1,13 +1,13 @@
 # Signals - Modular Audio Synthesizer Framework
 
-A modern modular synthesizer framework featuring a high-performance Rust core engine, a Python integration framework, and a visual Node Editor.
+A modern modular synthesizer framework designed to load C++ patches exported from RNBO as modules and combine them for audio processing.
 
 ## Overview
 
-Signals provides a toolkit for building digital audio synthesizers, focusing on modularity, performance, and flexibility. The architecture consists of:
+Signals provides a toolkit for building digital audio synthesizers, focusing on loading and combining RNBO DSP modules. The architecture consists of:
 
-1. **Rust Core Engine (`rust/`)**: Block-based (buffer) audio processing module graph and C++ RNBO patches natively bound via `cxx`.
-2. **Python Framework (`python/`)**: A high-level API and declarative YAML patch configurations that bridge down to the Rust engine.
+1. **Rust Core Engine (`rust/`)**: The main audio processing engine. It manages the module graph and executes block-based (buffer) audio processing. It natively binds C++ RNBO patches via `cxx` to be used as modules.
+2. **Python Framework (`python/`)**: A high-level API and declarative YAML patch configurations that bridge down to the Rust engine. (Note: The legacy Python core engine implementation is being deprecated in favor of the Rust core engine).
 3. **Visual Node Editor (`python/scripts/node_editor/`)**: A frontend for designing synthesizer patches visually in Vanilla JS + HTML5, interacting with a Python backend.
 
 ## Project Structure
