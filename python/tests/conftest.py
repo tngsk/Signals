@@ -22,12 +22,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from signals import (
-    VCA,
-    EnvelopeADSR,
     LogLevel,
-    Mixer,
-    Oscillator,
-    SynthEngine,
     configure_logging,
 )
 
@@ -154,17 +149,6 @@ def lfo_module():
         return lfo
     return _create
 
-
-
-@pytest.fixture
-def synth_engine():
-    """Create synthesis engine for testing."""
-    @contextlib.contextmanager
-    def _create(sample_rate=48000, buffer_size=1024):
-        engine = SynthEngine(sample_rate, buffer_size)
-        yield engine
-        engine.cleanup()
-    return _create
 
 
 @pytest.fixture

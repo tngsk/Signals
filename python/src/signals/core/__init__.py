@@ -14,7 +14,6 @@ from .context import (
     require_context,
     synthesis_context,
 )
-from .dsp import generate_silence, write_wav
 from .logging import (
     LogContext,
     LogLevel,
@@ -33,8 +32,6 @@ __all__ = [
     "Signal",
     "SignalType",
     "ParameterType",
-    "write_wav",
-    "generate_silence",
     # Logging
     "get_logger",
     "configure_logging",
