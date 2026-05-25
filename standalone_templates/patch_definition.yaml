@@ -1,0 +1,68 @@
+# Declarative Patch Definition Template
+# モジュール構成やパラメーター、シーケンスを宣言的に定義するYAMLテンプレートです。
+# このファイルはコアエンジンに渡され、オーディオ処理グラフを構築します。
+
+name: "Template Synthesizer Patch"
+description: "A minimal example of a declarative synthesizer configuration"
+sample_rate: 48000
+
+# 1. モジュールの定義
+# 使用するモジュールとその初期パラメーターを設定します。
+modules:
+  # オシレーターモジュール
+  osc1:
+    type: "oscillator"
+    parameters:
+      waveform: "sine"
+      frequency: 440.0 # A4
+      amplitude: 0.8
+
+  # エンベロープジェネレーター (ADSR)
+  env1:
+    type: "envelope_adsr"
+    parameters:
+      attack: 0.05
+      decay: 0.2
+      sustain: 0.5
+      release: 0.4
+
+  # VCA (Voltage Controlled Amplifier)
+  vca1:
+    type: "vca"
+    parameters:
+      gain: 1.0 # 基準となるゲイン
+
+  # オーディオ出力
+  output:
+    type: "output_wav"
+    parameters:
+      filename: "template_out.wav"
+
+# 2. 接続の定義
+# モジュールの出力ポート(from)と入力ポート(to)を接続します。
+# 形式: "モジュールID.ポート番号" (デフォルトのポート番号は 0)
+connections:
+  # オシレーターの音声出力をVCAの音声入力(0番)へ
+  - from: "osc1.0"
+    to: "vca1.0"
+
+  # エンベロープの出力をVCAの制御入力(CV入力: 1番)へ
+  - from: "env1.0"
+    to: "vca1.1"
+
+  # VCAの音声出力を最終出力へ
+  - from: "vca1.0"
+    to: "output.0"
+
+# 3. シーケンスの定義
+# 時間軸(秒)に沿って発生させるイベントを定義します。
+sequence:
+  # 0.0秒にノートオン(trigger)イベントをenv1に送る
+  - time: 0.0
+    action: "trigger"
+    target: "env1"
+
+  # 1.5秒にノートオフ(release)イベントをenv1に送る
+  - time: 1.5
+    action: "release"
+    target: "env1"
