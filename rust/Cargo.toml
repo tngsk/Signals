@@ -19,3 +19,18 @@ members = [
     ".",
     "rnbo_analog_rust"
 ]
+
+[[test]]
+name = "bench"
+path = "tests/bench.rs"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "benchmark"
+harness = false
+
+[[bench]]
+name = "benchmark2"
+harness = false

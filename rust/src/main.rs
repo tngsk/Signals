@@ -61,7 +61,7 @@ impl Module for BasicVCA {
     fn input_count(&self) -> usize { 2 } // audio in, cv in
     fn output_count(&self) -> usize { 1 }
 
-    fn process(&mut self, inputs: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    fn process(&mut self, inputs: &[&[f64]]) -> Vec<Vec<f64>> {
         let block_size = inputs.get(0).map_or(64, |v| v.len());
         let mut out = vec![0.0; block_size];
 
@@ -95,7 +95,7 @@ impl Module for ADSRModule {
     fn input_count(&self) -> usize { 0 }
     fn output_count(&self) -> usize { 1 }
 
-    fn process(&mut self, inputs: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    fn process(&mut self, inputs: &[&[f64]]) -> Vec<Vec<f64>> {
         let block_size = if !inputs.is_empty() && !inputs[0].is_empty() { inputs[0].len() } else { 64 };
         let mut out = vec![0.0; block_size];
         for i in 0..block_size {
@@ -132,7 +132,7 @@ impl Module for AnalogOscModule {
     fn input_count(&self) -> usize { 1 } // freq in
     fn output_count(&self) -> usize { 1 }
 
-    fn process(&mut self, inputs: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    fn process(&mut self, inputs: &[&[f64]]) -> Vec<Vec<f64>> {
         let block_size = if !inputs.is_empty() && !inputs[0].is_empty() { inputs[0].len() } else { 64 };
 
         let mut freq_block = vec![self.freq as f32; block_size];
@@ -165,7 +165,13 @@ fn main() {
     let block_size = 64;
 
     let mut graph = ModuleGraph::new(sample_rate as usize, block_size);
-    let mut output_filename = String::from("../audio/output.wav");
+    let audio_dir = if std::path::Path::new("../audio").exists() || std::path::Path::new("../Cargo.toml").exists() {
+        "../audio"
+    } else {
+        "audio"
+    };
+    std::fs::create_dir_all(audio_dir).unwrap_or_default();
+    let mut output_filename = format!("{}/output.wav", audio_dir);
     let mut output_source_node = String::new();
 
     // Create modules
@@ -195,7 +201,7 @@ fn main() {
             graph.add_module(id.clone(), Box::new(ADSRModule::new(sample_rate, a, d, s, r)));
         } else if config.module_type == "output_wav" {
             if let Some(fname) = config.parameters.get("filename").and_then(|v| v.as_str()) {
-                output_filename = format!("../audio/{}", fname);
+                output_filename = format!("{}/{}", audio_dir, fname);
             }
         } else if config.module_type == "rnbo_oscillator" {
             let mut osc = Box::new(RNBOModule::with_config(sample_rate, block_size));
@@ -254,7 +260,7 @@ fn main() {
     };
 
     // Ensure dir exists
-    std::fs::create_dir_all("../audio").unwrap_or_default();
+
 
     let mut writer = hound::WavWriter::create(&output_filename, spec).expect("Failed to create wav writer");
 

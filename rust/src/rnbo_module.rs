@@ -54,7 +54,7 @@ impl Module for RNBOModule {
         self.inner.get_num_outputs()
     }
 
-    fn process(&mut self, inputs: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    fn process(&mut self, inputs: &[&[f64]]) -> Vec<Vec<f64>> {
         let num_inputs = self.input_count();
         let num_outputs = self.output_count();
 
@@ -68,7 +68,7 @@ impl Module for RNBOModule {
         for i in 0..num_inputs {
             if i < inputs.len() && inputs[i].len() == actual_block_size {
                 let start = i * actual_block_size;
-                flattened_inputs[start..start+actual_block_size].copy_from_slice(&inputs[i]);
+                flattened_inputs[start..start+actual_block_size].copy_from_slice(inputs[i]);
             }
         }
 

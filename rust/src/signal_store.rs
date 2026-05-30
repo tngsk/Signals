@@ -4,6 +4,7 @@ use std::collections::HashMap;
 pub struct SignalStore {
     signals: HashMap<String, Vec<f64>>,
     block_size: usize,
+    zero_buffer: Vec<f64>,
 }
 
 impl SignalStore {
@@ -11,6 +12,7 @@ impl SignalStore {
         Self {
             signals: HashMap::new(),
             block_size,
+            zero_buffer: vec![0.0; block_size],
         }
     }
 
@@ -18,8 +20,12 @@ impl SignalStore {
         self.signals.get(key)
     }
 
-    pub fn get_or_zeros(&self, key: &str) -> Vec<f64> {
-        self.signals.get(key).cloned().unwrap_or_else(|| vec![0.0; self.block_size])
+    pub fn get_or_zeros(&self, key: &str) -> &[f64] {
+        self.signals.get(key).map(|v| v.as_slice()).unwrap_or(&self.zero_buffer)
+    }
+
+    pub fn get_zeros(&self) -> &[f64] {
+        &self.zero_buffer
     }
 
     pub fn set(&mut self, key: String, signal: Vec<f64>) {
