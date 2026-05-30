@@ -122,9 +122,9 @@ impl ModuleGraph {
                 let mut node_outputs = Vec::new();
                 for i in 0..node.module.output_count() {
                     if let Some(bus_key) = node.output_keys.get(&i) {
-                        node_outputs.push(self.store.get_or_zeros(bus_key));
+                        node_outputs.push(self.store.get_or_zeros(bus_key).to_vec());
                     } else {
-                        node_outputs.push(vec![0.0; self.block_size]);
+                        node_outputs.push(self.store.get_zeros().to_vec());
                     }
                 }
                 outputs.insert(module_id.clone(), node_outputs);

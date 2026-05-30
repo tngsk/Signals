@@ -7,7 +7,7 @@ struct DummyModule;
 impl Module for DummyModule {
     fn input_count(&self) -> usize { 1 }
     fn output_count(&self) -> usize { 1 }
-    fn process(&mut self, inputs: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    fn process(&mut self, inputs: &[&[f64]]) -> Vec<Vec<f64>> {
         let in_sig = &inputs[0];
         let mut out = vec![0.0; in_sig.len()];
         for i in 0..in_sig.len() {

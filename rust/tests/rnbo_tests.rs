@@ -11,7 +11,9 @@ use signals_core::rnbo_module::RNBOModule;
 fn test_rnbo_module_compiled() {
     // Just a placeholder test to avoid dead code warnings and ensure the test compiles.
     let mut module = RNBOModule::with_config(44100.0, 64);
-    let inputs = vec![vec![0.0; 64]; 2];
+    let buf1 = vec![0.0; 64];
+    let buf2 = vec![0.0; 64];
+    let inputs: Vec<&[f64]> = vec![&buf1, &buf2];
     let outputs = module.process(&inputs);
     assert_eq!(outputs.len(), module.output_count()); // Not invoking it to avoid segfaults
     assert!(true);

@@ -11,9 +11,9 @@ pub trait Module {
 
     /// Processes a block of audio.
     ///
-    /// Inputs are provided as a vector of vectors (each inner vector is a block for one input channel).
+    /// Inputs are provided as a slice of slices (each inner slice is a block for one input channel).
     /// Returns a vector of vectors containing the output blocks.
-    fn process(&mut self, inputs: &[Vec<f64>]) -> Vec<Vec<f64>>;
+    fn process(&mut self, inputs: &[&[f64]]) -> Vec<Vec<f64>>;
 
     /// Handle dynamic control messages like trigger/release
     fn handle_message(&mut self, _msg: &str) {}
@@ -37,15 +37,15 @@ impl StoreNode {
         }
     }
 
-    pub fn process(&mut self, store: &mut SignalStore, block_size: usize) {
+    pub fn process(&mut self, store: &mut SignalStore, _block_size: usize) {
         let input_count = self.module.input_count();
-        let mut inputs = Vec::with_capacity(input_count);
+        let mut inputs: Vec<&[f64]> = Vec::with_capacity(input_count);
 
         for i in 0..input_count {
             if let Some(key) = self.input_keys.get(&i) {
                 inputs.push(store.get_or_zeros(key));
             } else {
-                inputs.push(vec![0.0; block_size]);
+                inputs.push(store.get_zeros());
             }
         }
 
